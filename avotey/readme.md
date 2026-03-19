@@ -1,0 +1,1 @@
+need php-curl and php-imagick

@@ -1,0 +1,26 @@
+
+.progress {
+	width: 100%;
+}
+
+.progress > * {
+	border-radius: 0;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .printable, .printable * {
+        visibility: visible;
+    }
+	.not-printable, .not-printable * {
+		visibility: hidden;
+	}
+    .printable {
+		zoom: 125%;	
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+}
