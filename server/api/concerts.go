@@ -34,6 +34,13 @@ func handleConcertByID(w http.ResponseWriter, r *http.Request, data model.DataSe
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	idStr := strings.TrimPrefix(r.URL.Path, "/concerts/")
+	if idStr == "" || strings.Contains(idStr, "/") {
+		http.Error(w, "invalid concertID", http.StatusBadRequest)
+		return
+	}
+
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "invalid concertID", http.StatusBadRequest)

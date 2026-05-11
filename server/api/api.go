@@ -21,6 +21,9 @@ func ServeMux(data model.DataSet) *http.ServeMux {
 	mux.HandleFunc("/concerts", withLogging(func(w http.ResponseWriter, r *http.Request) {
 		handleConcerts(w, r, data)
 	}))
+	mux.HandleFunc("/concerts/", withLogging(func(w http.ResponseWriter, r *http.Request) {
+		handleConcertByID(w, r, data)
+	}))
 	return mux
 }
 
