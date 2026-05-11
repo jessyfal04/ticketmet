@@ -372,10 +372,16 @@ function renderConcertDetail(concert) {
 	$("#detailPhotos").empty();
 
 	photos.forEach((photo) => {
-		$("#detailPhotos").append(`<img src="${escapeHTML(photo)}" alt="${escapeHTML(name)}">`);
+		$("#detailPhotos").append(`
+			<div class="column is-half">
+				<figure class="image is-16by9">
+					<img class="is-rounded" src="${escapeHTML(photo)}" alt="${escapeHTML(name)}">
+				</figure>
+			</div>
+		`);
 	});
 	if (photos.length === 0) {
-		$("#detailPhotos").append(`<div class="notification is-light">Pas de photo.</div>`);
+		$("#detailPhotos").append(`<div class="column"><div class="notification is-light">Pas de photo.</div></div>`);
 	}
 
 	$("#detailName").attr("data-concert-id", id);

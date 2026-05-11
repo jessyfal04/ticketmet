@@ -9,7 +9,7 @@
 	<script src="lib/script.js"></script>
 	<title>TicketMet</title>
 </head>
-<body>
+<body class="has-background-light">
 	<section class="hero is-info">
 		<div class="hero-body">
 			<p class="title">TicketMet</p>
@@ -17,7 +17,7 @@
 		</div>
 	</section>
 
-	<div id="messages" class="messages"></div>
+	<div id="messages" class="messages mx-4 mt-4"></div>
 
 	<div class="box mx-6 mt-5">
 		<h2 class="title is-2">Auth</h2>
@@ -116,9 +116,11 @@
 				</div>
 			</div>
 
-			<div class="column is-narrow filter-actions">
-				<button class="button is-success is-medium" type="button" onclick="loadConcerts()">Filtrer</button>
-				<button class="button is-warning is-medium is-light" type="button" onclick="clearSearch()">Reset</button>
+			<div class="column is-narrow is-flex is-align-items-flex-end pb-3">
+				<div class="buttons mb-0">
+					<button class="button is-success is-medium" type="button" onclick="loadConcerts()">Filtrer</button>
+					<button class="button is-warning is-medium is-light" type="button" onclick="clearSearch()">Reset</button>
+				</div>
 			</div>
 		</div>
 
@@ -157,7 +159,7 @@
 					</p>
 				</div>
 				<div class="column">
-					<div id="detailPhotos" class="photo-strip"></div>
+					<div id="detailPhotos" class="columns is-multiline is-mobile"></div>
 				</div>
 			</div>
 
@@ -172,7 +174,7 @@
 			<div class="columns">
 				<div class="column">
 					<h4 class="title is-4">Setlist potentielle</h4>
-					<ul id="setlist" class="content-list"></ul>
+					<ul id="setlist" class="ml-4"></ul>
 				</div>
 				<div class="column">
 					<h4 class="title is-4">WTB / WTS</h4>
@@ -180,7 +182,7 @@
 				</div>
 				<div class="column">
 					<h4 class="title is-4">SNS</h4>
-					<ul id="snsList" class="content-list"></ul>
+					<ul id="snsList" class="ml-4"></ul>
 				</div>
 			</div>
 		</div>
