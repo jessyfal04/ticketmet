@@ -10,8 +10,9 @@ import (
 	"server/model"
 )
 
-func ServeMux(data model.DataSet) *http.ServeMux {
+func ServeMux(data model.DataSet, clientDir string) *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", withLogging(handleHealthz))
 	mux.HandleFunc("/artists", withLogging(func(w http.ResponseWriter, r *http.Request) {
 		handleArtists(w, r, data)
 	}))
@@ -30,7 +31,7 @@ func ServeMux(data model.DataSet) *http.ServeMux {
 	mux.HandleFunc("/concerts/", withLogging(func(w http.ResponseWriter, r *http.Request) {
 		handleConcertByID(w, r, data)
 	}))
-	mux.Handle("/", withLogging(http.FileServer(http.Dir("../client")).ServeHTTP))
+	mux.Handle("/", withLogging(http.FileServer(http.Dir(clientDir)).ServeHTTP))
 	return mux
 }
 
