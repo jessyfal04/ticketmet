@@ -14,8 +14,17 @@ func handleConcerts(w http.ResponseWriter, r *http.Request, data model.DataSet) 
 		return
 	}
 
-	artistID := parseOptionalInt(r.URL.Query().Get("artistID"))
-	venueID := parseOptionalInt(r.URL.Query().Get("venueID"))
+	artistIDParam := r.URL.Query().Get("artistID")
+	if artistIDParam == "" {
+		artistIDParam = r.URL.Query().Get("artisteId")
+	}
+	venueIDParam := r.URL.Query().Get("venueID")
+	if venueIDParam == "" {
+		venueIDParam = r.URL.Query().Get("salleId")
+	}
+
+	artistID := parseOptionalInt(artistIDParam)
+	venueID := parseOptionalInt(venueIDParam)
 
 	results := make([]model.Concert, 0, len(data.Concerts))
 	for _, concert := range data.Concerts {

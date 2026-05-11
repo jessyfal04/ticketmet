@@ -1,6 +1,6 @@
 .PHONY: test server
 
-TEST_SCRIPTS := $(wildcard src/server/test/*.sh)
+TEST_SCRIPTS := $(wildcard server/test/*.sh)
 
 test:
 	@if [ -z "$(TEST_SCRIPTS)" ]; then \

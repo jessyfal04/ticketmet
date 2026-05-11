@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="lib/bulma.min.css">
+	<link rel="stylesheet" href="lib/style.css">
+	<script src="lib/jquery.min.js"></script>
+	<script src="lib/script.js"></script>
+	<title>TicketMet</title>
+</head>
+<body>
+	<section class="hero is-info">
+		<div class="hero-body">
+			<p class="title">TicketMet</p>
+			<p class="subtitle">Concerts, alertes et SNS</p>
+		</div>
+	</section>
+
+	<div id="messages" class="messages"></div>
+
+	<div class="box mx-6 mt-5">
+		<h2 class="title is-2">Auth</h2>
+
+		<p class="is-size-5 if-login" style="display:none;">
+			Bonjour <strong id="txt-connexion-pseudo"></strong>
+		</p>
+		<p class="is-size-5 if-not-login">Veuillez vous connecter.</p>
+
+		<div class="block if-login" style="display:none;">
+			<button class="button is-danger is-medium" type="button" onclick="logout()">Se déconnecter</button>
+		</div>
+
+		<div class="if-not-login">
+			<div class="columns">
+				<div class="column">
+					<div class="field">
+						<label class="label" for="authPseudo">Pseudo</label>
+						<div class="control">
+							<input class="input" type="text" id="authPseudo" placeholder="alice">
+						</div>
+					</div>
+				</div>
+				<div class="column">
+					<div class="field">
+						<label class="label" for="authPassword">Mot de passe</label>
+						<div class="control">
+							<input class="input" type="password" id="authPassword" placeholder="********">
+						</div>
+					</div>
+				</div>
+				<div class="column">
+					<div class="field">
+						<label class="label" for="authSNS">SNS</label>
+						<div class="control">
+							<input class="input" type="text" id="authSNS" placeholder="@alice, instagram.com/alice">
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="field is-grouped">
+				<div class="control">
+					<button class="button is-link is-medium" type="button" onclick="login()">Login</button>
+				</div>
+				<div class="control">
+					<button class="button is-link is-medium is-outlined" type="button" onclick="register()">Register</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="box mx-6">
+		<h2 class="title is-2">Recherche</h2>
+
+		<div class="columns">
+			<div class="column">
+				<div class="field">
+					<label class="label" for="artistSearch">Artiste</label>
+					<div class="field has-addons">
+						<div class="control is-expanded">
+							<input class="input" type="text" id="artistSearch" placeholder="NMIXX">
+						</div>
+						<div class="control">
+							<button class="button is-info" type="button" onclick="searchArtists()">Chercher</button>
+						</div>
+					</div>
+				</div>
+				<div class="field">
+					<div class="select is-fullwidth">
+						<select id="artistResults" onchange="selectArtist()">
+							<option value="">Tous les artistes</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<div class="column">
+				<div class="field">
+					<label class="label" for="venueSearch">Salle</label>
+					<div class="field has-addons">
+						<div class="control is-expanded">
+							<input class="input" type="text" id="venueSearch" placeholder="Accor">
+						</div>
+						<div class="control">
+							<button class="button is-info" type="button" onclick="searchVenues()">Chercher</button>
+						</div>
+					</div>
+				</div>
+				<div class="field">
+					<div class="select is-fullwidth">
+						<select id="venueResults" onchange="selectVenue()">
+							<option value="">Toutes les salles</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<div class="column is-narrow filter-actions">
+				<button class="button is-success is-medium" type="button" onclick="loadConcerts()">Filtrer</button>
+				<button class="button is-warning is-medium is-light" type="button" onclick="clearSearch()">Reset</button>
+			</div>
+		</div>
+
+		<div class="block table-container">
+			<table class="table is-hoverable is-fullwidth">
+				<thead>
+					<tr>
+						<th>Concert</th>
+						<th>Date</th>
+						<th>Salle</th>
+						<th>Artiste</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody id="concertsList"></tbody>
+			</table>
+		</div>
+	</div>
+
+	<div class="box mx-6">
+		<h2 class="title is-2">Fiche concert</h2>
+
+		<p id="noConcertText" class="is-size-5">Sélectionnez un concert depuis la recherche.</p>
+
+		<div id="concertDetails" style="display:none;">
+			<div class="columns">
+				<div class="column is-two-thirds">
+					<h3 class="title is-3" id="detailName"></h3>
+					<p class="is-size-5">
+						<span id="detailDate"></span><br>
+						<span id="detailVenue"></span><br>
+						<span id="detailArtist"></span>
+					</p>
+					<p class="mt-3">
+						<a id="detailURL" href="#" target="_blank" rel="noreferrer">Page de vente</a>
+					</p>
+				</div>
+				<div class="column">
+					<div id="detailPhotos" class="photo-strip"></div>
+				</div>
+			</div>
+
+			<div class="buttons">
+				<button class="button is-success" type="button" onclick="addFavori()">Ajouter aux favoris</button>
+				<button class="button is-warning is-light" type="button" onclick="removeFavori()">Retirer des favoris</button>
+				<button class="button is-link" type="button" onclick="setWT('wtb')">WTB</button>
+				<button class="button is-info" type="button" onclick="setWT('wts')">WTS</button>
+				<button class="button is-danger is-light" type="button" onclick="removeWT()">Retirer WT</button>
+			</div>
+
+			<div class="columns">
+				<div class="column">
+					<h4 class="title is-4">Setlist potentielle</h4>
+					<ul id="setlist" class="content-list"></ul>
+				</div>
+				<div class="column">
+					<h4 class="title is-4">WTB / WTS</h4>
+					<div id="wtList" class="tags"></div>
+				</div>
+				<div class="column">
+					<h4 class="title is-4">SNS</h4>
+					<ul id="snsList" class="content-list"></ul>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="box mx-6">
+		<h2 class="title is-2">Profil</h2>
+
+		<p class="is-size-5 if-not-login">Vous devez être connecté pour gérer votre profil.</p>
+
+		<div class="if-login" style="display:none;">
+			<div class="columns">
+				<div class="column">
+					<h3 class="title is-4">SNS</h3>
+					<div class="field has-addons">
+						<div class="control is-expanded">
+							<input class="input" type="text" id="profileSNS" placeholder="@alice, instagram.com/alice">
+						</div>
+						<div class="control">
+							<button class="button is-success" type="button" onclick="patchMe()">Enregistrer</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="column">
+					<h3 class="title is-4">Alertes nouveauté</h3>
+					<div class="field has-addons">
+						<div class="control">
+							<div class="select">
+								<select id="alertTargetType">
+									<option value="artiste">Artiste</option>
+									<option value="salle">Salle</option>
+								</select>
+							</div>
+						</div>
+						<div class="control is-expanded">
+							<input class="input" type="number" id="alertTargetID" placeholder="ID">
+						</div>
+						<div class="control">
+							<button class="button is-info" type="button" onclick="createAlert()">Créer</button>
+						</div>
+					</div>
+					<div class="field has-addons">
+						<div class="control is-expanded">
+							<input class="input" type="number" id="deleteAlertID" placeholder="ID alerte">
+						</div>
+						<div class="control">
+							<button class="button is-danger is-light" type="button" onclick="deleteAlert()">Supprimer</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="columns">
+				<div class="column">
+					<h4 class="title is-5">Favoris</h4>
+					<div id="profileFavoris" class="tags"></div>
+				</div>
+				<div class="column">
+					<h4 class="title is-5">WTB / WTS</h4>
+					<div id="profileWT" class="tags"></div>
+				</div>
+				<div class="column">
+					<h4 class="title is-5">Alertes</h4>
+					<div id="profileAlerts" class="tags"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<footer class="footer">
+		<div class="content has-text-centered">
+			<p><strong>TicketMet</strong> - projet universitaire PC3R.</p>
+		</div>
+	</footer>
+</body>
+</html>

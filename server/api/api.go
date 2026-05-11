@@ -15,7 +15,13 @@ func ServeMux(data model.DataSet) *http.ServeMux {
 	mux.HandleFunc("/artists", withLogging(func(w http.ResponseWriter, r *http.Request) {
 		handleArtists(w, r, data)
 	}))
+	mux.HandleFunc("/artistes", withLogging(func(w http.ResponseWriter, r *http.Request) {
+		handleArtists(w, r, data)
+	}))
 	mux.HandleFunc("/venues", withLogging(func(w http.ResponseWriter, r *http.Request) {
+		handleVenues(w, r, data)
+	}))
+	mux.HandleFunc("/salles", withLogging(func(w http.ResponseWriter, r *http.Request) {
 		handleVenues(w, r, data)
 	}))
 	mux.HandleFunc("/concerts", withLogging(func(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +30,7 @@ func ServeMux(data model.DataSet) *http.ServeMux {
 	mux.HandleFunc("/concerts/", withLogging(func(w http.ResponseWriter, r *http.Request) {
 		handleConcertByID(w, r, data)
 	}))
+	mux.Handle("/", withLogging(http.FileServer(http.Dir("../client")).ServeHTTP))
 	return mux
 }
 
