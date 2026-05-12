@@ -27,7 +27,7 @@ type Artist struct {
 
 type User struct {
 	ID int
-	Pseudo string
+	Username string
 	SNS []string
 }
 
@@ -44,7 +44,7 @@ type WT struct {
 	Type WTType
 }
 
-type Favoris struct {
+type Favorite struct {
 	UserID int
 	ConcertID int
 }
@@ -52,8 +52,8 @@ type Favoris struct {
 type Alert struct {
 	AlertID int
 	UserID int
-	CibleType string
-	CibleID int
+	TargetType string
+	TargetID int
 }
 
 type Setlist struct {
@@ -71,7 +71,7 @@ type DataSet struct {
 	Concerts []Concert
 	Users []User
 	WTs []WT
-	Favoris []Favoris
+	Favorites []Favorite
 	Alerts []Alert
 	Setlists []Setlist
 	Sync SyncTicketmaster

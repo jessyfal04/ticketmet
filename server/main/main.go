@@ -1,28 +1,55 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
+	_ "modernc.org/sqlite"
+	_ "embed"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"server/api"
-	"server/model"
 )
 
+//go:embed schema.sql
+var schemaSQL string // Put the content of schema.sql in the string
+
 func main() {
-	data := model.DummyData()
+	db, err := openDB(getenv("DB_PATH", "data/ticketmet.sqlite3"))
+	if err != nil {
+		log.Fatalf("DB error: %v", err)
+	}
+	defer db.Close()
+
 	clientDir := getenv("CLIENT_DIR", "../client")
-	mux := api.ServeMux(data, clientDir)
+	mux := api.ServeMux(db, clientDir)
 
 	addr := ":" + getenv("PORT", "8080")
-	fmt.Printf("Listening on %s\n", addr)
+	log.Printf("Listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
 }
 
-// Return the value of the environment variable `key` if it exists, otherwise return `fallback`.
+func openDB(path string) (*sql.DB, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.Exec(schemaSQL); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
 func getenv(key, fallback string) string {
 	value := os.Getenv(key)
 	if value == "" {

@@ -1,26 +1,21 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
-	"strings"
-
 	"server/model"
 )
 
-func handleArtists(w http.ResponseWriter, r *http.Request, data model.DataSet) {
+func handleArtists(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		httpMethodNotAllowedError(w)
 		return
 	}
 
-	query := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("search")))
-	
-	results := make([]model.Artist, 0, len(data.Artists))
-	for _, artist := range data.Artists {
-		if query == "" || strings.Contains(strings.ToLower(artist.Name), query) {
-			results = append(results, artist)
-		}
-	}
-
-	writeJSON(w, results)
+	search := sqlLikeSearch(r.URL.Query().Get("search"))
+	sqlQueryList(w, r, db, "artists", `
+		SELECT id, name
+		FROM artists
+		WHERE ? = '' OR lower(name) LIKE ?
+		ORDER BY name`, model.ScanArtist, search, search)
 }

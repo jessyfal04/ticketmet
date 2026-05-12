@@ -26,4 +26,4 @@ docker-push: docker-build
 	docker push $(IMAGE)
 
 docker-deploy:
-	ssh $(VPS) 'docker pull $(IMAGE); docker stop ticketmet 2>/dev/null || true; docker rm ticketmet 2>/dev/null || true; docker run -d --name ticketmet --restart unless-stopped -p 127.0.0.1:$(VPS_PORT):8080 $(IMAGE); docker ps --filter name=ticketmet'
+	ssh $(VPS) 'mkdir -p /opt/ticketmet/data; docker pull $(IMAGE); docker stop ticketmet 2>/dev/null || true; docker rm ticketmet 2>/dev/null || true; docker run -d --name ticketmet --restart unless-stopped -p 127.0.0.1:$(VPS_PORT):8080 -v /opt/ticketmet/data:/app/data $(IMAGE); docker ps --filter name=ticketmet'

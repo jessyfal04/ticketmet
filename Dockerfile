@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION=1.24.4
+ARG GO_VERSION=1.25.0
 ARG ALPINE_VERSION=3.21
 
 FROM golang:${GO_VERSION}-alpine AS build
 
 WORKDIR /src/server
-COPY server/go.mod ./
+COPY server/go.mod server/go.sum ./
 RUN go mod download
 
 COPY server/ ./
@@ -19,9 +19,11 @@ RUN addgroup -S ticketmet && adduser -S -G ticketmet ticketmet
 WORKDIR /app
 COPY --from=build /out/ticketmet /app/ticketmet
 COPY client /app/client
+RUN mkdir -p /app/data && chown -R ticketmet:ticketmet /app/data
 
 ENV PORT=8080
 ENV CLIENT_DIR=/app/client
+ENV DB_PATH=/app/data/ticketmet.sqlite3
 
 EXPOSE 8080
 

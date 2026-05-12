@@ -63,8 +63,8 @@ func DummyData() DataSet {
 	}
 
 	users := []User{
-		{ID: 1, Pseudo: "alice", SNS: []string{"@alice"}},
-		{ID: 2, Pseudo: "bob", SNS: []string{"@bob"}},
+		{ID: 1, Username: "alice", SNS: []string{"@alice"}},
+		{ID: 2, Username: "bob", SNS: []string{"@bob"}},
 	}
 
 	wts := []WT{
@@ -72,14 +72,14 @@ func DummyData() DataSet {
 		{UserID: users[1].ID, ConcertID: concerts[1].ID, Type: WTS},
 	}
 
-	favoris := []Favoris{
+	favorites := []Favorite{
 		{UserID: users[0].ID, ConcertID: concerts[0].ID},
 		{UserID: users[1].ID, ConcertID: concerts[2].ID},
 	}
 
 	alerts := []Alert{
-		{AlertID: 1, UserID: users[0].ID, CibleType: "artist", CibleID: artists[0].ID},
-		{AlertID: 2, UserID: users[1].ID, CibleType: "venue", CibleID: venues[1].ID},
+		{AlertID: 1, UserID: users[0].ID, TargetType: "artist", TargetID: artists[0].ID},
+		{AlertID: 2, UserID: users[1].ID, TargetType: "venue", TargetID: venues[1].ID},
 	}
 
 	setlists := []Setlist{
@@ -93,14 +93,14 @@ func DummyData() DataSet {
 	}
 
 	return DataSet{
-		Venues:   venues,
-		Artists:  artists,
-		Concerts: concerts,
-		Users:    users,
-		WTs:      wts,
-		Favoris:  favoris,
-		Alerts:   alerts,
-		Setlists: setlists,
-		Sync:     sync,
+		Venues:    venues,
+		Artists:   artists,
+		Concerts:  concerts,
+		Users:     users,
+		WTs:       wts,
+		Favorites: favorites,
+		Alerts:    alerts,
+		Setlists:  setlists,
+		Sync:      sync,
 	}
 }

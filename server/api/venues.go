@@ -1,26 +1,22 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
-	"strings"
 
 	"server/model"
 )
 
-func handleVenues(w http.ResponseWriter, r *http.Request, data model.DataSet) {
+func handleVenues(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		httpMethodNotAllowedError(w)
 		return
 	}
 
-	query := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("search")))
-	
-	results := make([]model.Venue, 0, len(data.Venues))
-	for _, venue := range data.Venues {
-		if query == "" || strings.Contains(strings.ToLower(venue.Name), query) {
-			results = append(results, venue)
-		}
-	}
-
-	writeJSON(w, results)
+	search := sqlLikeSearch(r.URL.Query().Get("search"))
+	sqlQueryList(w, r, db, "venues", `
+		SELECT id, name, city, country
+		FROM venues
+		WHERE ? = '' OR lower(name) LIKE ?
+		ORDER BY name`, model.ScanVenue, search, search)
 }

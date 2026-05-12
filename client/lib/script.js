@@ -14,7 +14,7 @@ $(function () {
 	const savedProfile = readLocalProfile();
 	if (savedProfile) {
 		state.profile = savedProfile;
-		toggleConnected(true, savedProfile.pseudo || "local");
+		toggleConnected(true, savedProfile.username || "local");
 	}
 
 	loadLookups();
@@ -103,12 +103,12 @@ function saveLocalProfile() {
 	}
 }
 
-function profileOrDefault(pseudo, sns) {
+function profileOrDefault(username, sns) {
 	return {
 		id: Date.now(),
-		pseudo: pseudo,
+		username: username,
 		sns: sns,
-		favoris: [],
+		favorites: [],
 		wts: [],
 		alerts: [],
 	};
@@ -118,19 +118,19 @@ function normalizeProfile(payload, fallback) {
 	const data = payload && (payload.data || payload.user || payload.User || payload);
 	return {
 		id: field(data, ["ID", "id"], field(fallback, ["id"], Date.now())),
-		pseudo: field(data, ["Pseudo", "pseudo"], field(fallback, ["pseudo"], "")),
+		username: field(data, ["Username", "username"], field(fallback, ["username"], "")),
 		sns: field(data, ["SNS", "sns"], field(fallback, ["sns"], [])),
-		favoris: field(data, ["Favoris", "favoris"], field(fallback, ["favoris"], [])),
+		favorites: field(data, ["Favorites", "favorites"], field(fallback, ["favorites"], [])),
 		wts: field(data, ["WTs", "wts", "WT", "wt"], field(fallback, ["wts"], [])),
-		alerts: field(data, ["Alerts", "alerts", "Alertes", "alertes"], field(fallback, ["alerts"], [])),
+		alerts: field(data, ["Alerts", "alerts"], field(fallback, ["alerts"], [])),
 	};
 }
 
-function toggleConnected(connected, pseudo = "") {
+function toggleConnected(connected, username = "") {
 	state.connected = connected;
 	$(".if-login").css("display", connected ? "" : "none");
 	$(".if-not-login").css("display", connected ? "none" : "");
-	$("#txt-connexion-pseudo").text(pseudo);
+	$("#txt-connexion-username").text(username);
 
 	if (connected) {
 		loadProfile();
@@ -142,7 +142,7 @@ function toggleConnected(connected, pseudo = "") {
 
 function authPayload() {
 	return {
-		pseudo: $("#authPseudo").val().trim(),
+		username: $("#authUsername").val().trim(),
 		password: $("#authPassword").val(),
 		sns: JSON.stringify(splitSNS($("#authSNS").val())),
 	};
@@ -158,28 +158,28 @@ function login() {
 
 function authAction(action) {
 	const payload = authPayload();
-	if (!payload.pseudo) {
-		setMessages("danger", "Pseudo obligatoire.");
+	if (!payload.username) {
+		setMessages("danger", "Username obligatoire.");
 		return;
 	}
 
 	requestJSON("POST", `/auth/${action}`, payload)
 		.done(function (response) {
 			state.localSession = false;
-			state.profile = normalizeProfile(response, profileOrDefault(payload.pseudo, JSON.parse(payload.sns)));
+			state.profile = normalizeProfile(response, profileOrDefault(payload.username, JSON.parse(payload.sns)));
 			saveLocalProfile();
-			toggleConnected(true, state.profile.pseudo);
+			toggleConnected(true, state.profile.username);
 			setMessages("success", "Session ouverte.");
 		})
 		.fail(function () {
 			state.localSession = true;
-			state.profile = readLocalProfile() || profileOrDefault(payload.pseudo, JSON.parse(payload.sns));
-			state.profile.pseudo = payload.pseudo;
+			state.profile = readLocalProfile() || profileOrDefault(payload.username, JSON.parse(payload.sns));
+			state.profile.username = payload.username;
 			if (splitSNS($("#authSNS").val()).length > 0) {
 				state.profile.sns = splitSNS($("#authSNS").val());
 			}
 			saveLocalProfile();
-			toggleConnected(true, state.profile.pseudo);
+			toggleConnected(true, state.profile.username);
 			setMessages("warning", "Auth serveur indisponible : session locale activée.");
 		});
 }
@@ -194,13 +194,13 @@ function logout() {
 }
 
 function loadLookups() {
-	requestJSON("GET", ["/artistes", "/artists"], { search: "" })
+	requestJSON("GET", "/artists", { search: "" })
 		.done(function (artists) {
 			state.artists = Array.isArray(artists) ? artists : [];
 			renderArtistOptions(state.artists);
 		});
 
-	requestJSON("GET", ["/salles", "/venues"], { search: "" })
+	requestJSON("GET", "/venues", { search: "" })
 		.done(function (venues) {
 			state.venues = Array.isArray(venues) ? venues : [];
 			renderVenueOptions(state.venues);
@@ -219,32 +219,32 @@ function mergeByID(target, items) {
 }
 
 function searchArtists() {
-	requestJSON("GET", ["/artistes", "/artists"], { search: $("#artistSearch").val() })
+	requestJSON("GET", "/artists", { search: $("#artistSearch").val() })
 		.done(function (artists) {
 			const results = Array.isArray(artists) ? artists : [];
 			state.artists = mergeByID(state.artists, results);
 			renderArtistOptions(results);
 		})
 		.fail(function () {
-			setMessages("danger", "Impossible de récupérer les artistes.");
+			setMessages("danger", "Impossible de récupérer les artists.");
 		});
 }
 
 function searchVenues() {
-	requestJSON("GET", ["/salles", "/venues"], { search: $("#venueSearch").val() })
+	requestJSON("GET", "/venues", { search: $("#venueSearch").val() })
 		.done(function (venues) {
 			const results = Array.isArray(venues) ? venues : [];
 			state.venues = mergeByID(state.venues, results);
 			renderVenueOptions(results);
 		})
 		.fail(function () {
-			setMessages("danger", "Impossible de récupérer les salles.");
+			setMessages("danger", "Impossible de récupérer les venues.");
 		});
 }
 
 function renderArtistOptions(artists) {
 	const selected = state.selectedArtistID;
-	$("#artistResults").html(`<option value="">Tous les artistes</option>`);
+	$("#artistResults").html(`<option value="">Tous les artists</option>`);
 	artists.forEach((artist) => {
 		const id = itemID(artist);
 		const name = field(artist, ["Name", "name"], "");
@@ -255,7 +255,7 @@ function renderArtistOptions(artists) {
 
 function renderVenueOptions(venues) {
 	const selected = state.selectedVenueID;
-	$("#venueResults").html(`<option value="">Toutes les salles</option>`);
+	$("#venueResults").html(`<option value="">Toutes les venues</option>`);
 	venues.forEach((venue) => {
 		const id = itemID(venue);
 		const name = field(venue, ["Name", "name"], "");
@@ -287,11 +287,9 @@ function clearSearch() {
 function loadConcerts() {
 	const data = {};
 	if (state.selectedArtistID) {
-		data.artisteId = state.selectedArtistID;
 		data.artistID = state.selectedArtistID;
 	}
 	if (state.selectedVenueID) {
-		data.salleId = state.selectedVenueID;
 		data.venueID = state.selectedVenueID;
 	}
 
@@ -316,8 +314,8 @@ function renderConcerts() {
 		const id = itemID(concert);
 		const name = field(concert, ["Name", "name"], "");
 		const date = formatDate(field(concert, ["Date", "date"], ""));
-		const venueID = field(concert, ["VenueID", "venueID", "salleId"], "");
-		const artistID = field(concert, ["ArtistID", "artistID", "artisteId"], "");
+		const venueID = field(concert, ["VenueID", "venueID"], "");
+		const artistID = field(concert, ["ArtistID", "artistID"], "");
 
 		$("#concertsList").append(`
 			<tr>
@@ -357,8 +355,8 @@ function renderConcertDetail(concert) {
 	const name = field(concert, ["Name", "name"], "");
 	const date = formatDate(field(concert, ["Date", "date"], ""));
 	const saleStart = formatDate(field(concert, ["SaleStartDateTime", "saleStartDateTime"], ""));
-	const venueID = field(concert, ["VenueID", "venueID", "salleId"], "");
-	const artistID = field(concert, ["ArtistID", "artistID", "artisteId"], "");
+	const venueID = field(concert, ["VenueID", "venueID"], "");
+	const artistID = field(concert, ["ArtistID", "artistID"], "");
 	const url = field(concert, ["URL", "url"], "#");
 	const photos = field(concert, ["Photos", "photos"], []);
 
@@ -410,7 +408,7 @@ function loadConcertExtras(id) {
 			renderSNS(Array.isArray(payload) ? payload : field(payload, ["SNS", "sns", "users"], []));
 		})
 		.fail(function () {
-			const sns = state.profile && isFavori(id) ? state.profile.sns : [];
+			const sns = state.profile && isFavorite(id) ? state.profile.sns : [];
 			renderSNS(sns);
 		});
 }
@@ -450,47 +448,47 @@ function renderSNS(entries) {
 			$("#snsList").append(`<li>${escapeHTML(entry)}</li>`);
 			return;
 		}
-		const pseudo = field(entry, ["Pseudo", "pseudo"], "utilisateur");
+		const username = field(entry, ["Username", "username"], "utilisateur");
 		const sns = field(entry, ["SNS", "sns"], []);
-		$("#snsList").append(`<li>${escapeHTML(pseudo)} : ${escapeHTML(sns.join(", "))}</li>`);
+		$("#snsList").append(`<li>${escapeHTML(username)} : ${escapeHTML(sns.join(", "))}</li>`);
 	});
 }
 
-function addFavori() {
+function addFavorite() {
 	const id = currentConcertID();
 	if (!requireLogin() || !id) return;
 
-	requestJSON("POST", `/concerts/${id}/favoris`)
+	requestJSON("POST", `/concerts/${id}/favorites`)
 		.done(function () {
-			setMessages("success", "Favori ajouté.");
+			setMessages("success", "Favorite ajouté.");
 			loadProfile();
 		})
 		.fail(function () {
-			if (!isFavori(id)) {
-				state.profile.favoris.push({ concertId: id });
+			if (!isFavorite(id)) {
+				state.profile.favorites.push({ concertId: id });
 			}
 			saveLocalProfile();
 			renderProfile();
 			loadConcertExtras(id);
-			setMessages("warning", "Endpoint favoris indisponible : favori conservé localement.");
+			setMessages("warning", "Endpoint favorites indisponible : favorite conservé localement.");
 		});
 }
 
-function removeFavori() {
+function removeFavorite() {
 	const id = currentConcertID();
 	if (!requireLogin() || !id) return;
 
-	requestJSON("DELETE", `/concerts/${id}/favoris`)
+	requestJSON("DELETE", `/concerts/${id}/favorites`)
 		.done(function () {
-			setMessages("success", "Favori retiré.");
+			setMessages("success", "Favorite retiré.");
 			loadProfile();
 		})
 		.fail(function () {
-			state.profile.favoris = state.profile.favoris.filter((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], entry)) !== String(id));
+			state.profile.favorites = state.profile.favorites.filter((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], entry)) !== String(id));
 			saveLocalProfile();
 			renderProfile();
 			loadConcertExtras(id);
-			setMessages("warning", "Endpoint favoris indisponible : favori retiré localement.");
+			setMessages("warning", "Endpoint favorites indisponible : favorite retiré localement.");
 		});
 }
 
@@ -543,7 +541,7 @@ function loadProfile() {
 			renderProfile();
 		})
 		.fail(function () {
-			state.profile = state.profile || readLocalProfile() || profileOrDefault($("#authPseudo").val() || "local", []);
+			state.profile = state.profile || readLocalProfile() || profileOrDefault($("#authUsername").val() || "local", []);
 			renderProfile();
 		});
 }
@@ -570,29 +568,29 @@ function patchMe() {
 function createAlert() {
 	if (!requireLogin()) return;
 
-	const cibleType = $("#alertTargetType").val();
-	const cibleID = $("#alertTargetID").val();
-	if (!cibleID) {
-		setMessages("danger", "ID cible obligatoire.");
+	const targetType = $("#alertTargetType").val();
+	const targetID = $("#alertTargetID").val();
+	if (!targetID) {
+		setMessages("danger", "ID target obligatoire.");
 		return;
 	}
 
-	requestJSON("POST", "/alertes", { cibleType: cibleType, cibleId: cibleID })
+	requestJSON("POST", "/alerts", { targetType: targetType, targetId: targetID })
 		.done(function () {
-			setMessages("success", "Alerte créée.");
+			setMessages("success", "Alert créée.");
 			loadProfile();
 		})
 		.fail(function () {
 			const alert = {
 				alertId: Date.now(),
 				userId: state.profile.id,
-				cibleType: cibleType,
-				cibleId: Number(cibleID),
+				targetType: targetType,
+				targetId: Number(targetID),
 			};
 			state.profile.alerts.push(alert);
 			saveLocalProfile();
 			renderProfile();
-			setMessages("warning", "Endpoint alertes indisponible : alerte conservée localement.");
+			setMessages("warning", "Endpoint alerts indisponible : alert conservée localement.");
 		});
 }
 
@@ -601,34 +599,34 @@ function deleteAlert() {
 
 	const alertID = $("#deleteAlertID").val();
 	if (!alertID) {
-		setMessages("danger", "ID alerte obligatoire.");
+		setMessages("danger", "ID alert obligatoire.");
 		return;
 	}
 
-	requestJSON("DELETE", `/alertes/${alertID}`)
+	requestJSON("DELETE", `/alerts/${alertID}`)
 		.done(function () {
-			setMessages("success", "Alerte supprimée.");
+			setMessages("success", "Alert supprimée.");
 			loadProfile();
 		})
 		.fail(function () {
 			state.profile.alerts = state.profile.alerts.filter((entry) => String(field(entry, ["AlertID", "alertID", "alertId", "id"], "")) !== String(alertID));
 			saveLocalProfile();
 			renderProfile();
-			setMessages("warning", "Endpoint alertes indisponible : alerte supprimée localement.");
+			setMessages("warning", "Endpoint alerts indisponible : alert supprimée localement.");
 		});
 }
 
 function renderProfile() {
 	if (!state.profile) {
 		$("#profileSNS").val("");
-		$("#profileFavoris").empty();
+		$("#profileFavorites").empty();
 		$("#profileWT").empty();
 		$("#profileAlerts").empty();
 		return;
 	}
 
 	$("#profileSNS").val((state.profile.sns || []).join(", "));
-	renderTags("#profileFavoris", state.profile.favoris, function (entry) {
+	renderTags("#profileFavorites", state.profile.favorites, function (entry) {
 		const id = field(entry, ["ConcertID", "concertID", "concertId"], entry);
 		return `concert #${id}`;
 	});
@@ -639,9 +637,9 @@ function renderProfile() {
 	});
 	renderTags("#profileAlerts", state.profile.alerts, function (entry) {
 		const id = field(entry, ["AlertID", "alertID", "alertId", "id"], "");
-		const cibleType = field(entry, ["CibleType", "cibleType"], "");
-		const cibleID = field(entry, ["CibleID", "cibleID", "cibleId"], "");
-		return `alerte #${id} ${cibleType} #${cibleID}`;
+		const targetType = field(entry, ["TargetType", "targetType"], "");
+		const targetID = field(entry, ["TargetID", "targetID", "targetId"], "");
+		return `alert #${id} ${targetType} #${targetID}`;
 	});
 }
 
@@ -672,19 +670,19 @@ function requireLogin() {
 	return true;
 }
 
-function isFavori(concertID) {
+function isFavorite(concertID) {
 	if (!state.profile) return false;
-	return state.profile.favoris.some((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], entry)) === String(concertID));
+	return state.profile.favorites.some((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], entry)) === String(concertID));
 }
 
 function artistName(id) {
 	const artist = state.artists.find((entry) => String(itemID(entry)) === String(id));
-	return artist ? field(artist, ["Name", "name"], `artiste #${id}`) : `artiste #${id}`;
+	return artist ? field(artist, ["Name", "name"], `artist #${id}`) : `artist #${id}`;
 }
 
 function venueName(id) {
 	const venue = state.venues.find((entry) => String(itemID(entry)) === String(id));
-	if (!venue) return `salle #${id}`;
+	if (!venue) return `venue #${id}`;
 	const name = field(venue, ["Name", "name"], "");
 	const city = field(venue, ["City", "city"], "");
 	return city ? `${name}, ${city}` : name;
