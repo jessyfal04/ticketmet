@@ -34,7 +34,8 @@ docker-deploy:
 		set -e; \
 		mkdir -p /opt/ticketmet/data; \
 		docker pull $(IMAGE); \
-		docker run --rm --user root -v /opt/ticketmet/data:/data --entrypoint chown $(IMAGE) -R ticketmet:ticketmet /data; \
 		docker rm -f ticketmet 2>/dev/null || true; \
+		docker run --rm --user root -v /opt/ticketmet/data:/data --entrypoint rm $(IMAGE) -f /data/ticketmet.sqlite3 /data/ticketmet.sqlite3-shm /data/ticketmet.sqlite3-wal; \
+		docker run --rm --user root -v /opt/ticketmet/data:/data --entrypoint chown $(IMAGE) -R ticketmet:ticketmet /data; \
 		docker run -d --name ticketmet --restart unless-stopped -p 127.0.0.1:11200:8080 -e TICKETMASTER_API_KEY='$$TICKETMASTER_API_KEY' -v /opt/ticketmet/data:/app/data $(IMAGE); \
 		docker ps --filter name=ticketmet"

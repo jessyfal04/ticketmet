@@ -32,7 +32,13 @@ Elle facilite la mise en relation via les SNS pour faire du WTB/WTS et pour se r
 - Artist
   - id / name
 - User
-  - id / username / sns
+  - id / email / passwordHash / sns
+- Session
+  - id / userId / tokenHash / expiresAt
+- WebAuthnCredential
+  - id / userId / credentialId / publicKey / signCount
+- WebAuthnChallenge
+  - id / userId / tokenHash / kind / sessionData / expiresAt
 - WT
   - userId / concertId / wtType (wtb / wts)
 - Favorite
@@ -76,6 +82,7 @@ Setlist potentielle / par artiste (via attractions name)
 - Récupération + insertion des concerts via Ticketmaster
 - Pays synchronisés pour l'instant : Allemagne (`DE`) et France (`FR`)
 - Job automatique toutes les 15 minutes, avec clé Ticketmaster fournie par le shell (`TICKETMASTER_API_KEY`)
+- Le job Ticketmaster tourne en goroutine background.
 - Nettoyage sync actuel : ignore les events sans venue/artiste nommé, garde une seule photo, ignore les dates de vente aberrantes avant 2000
 - Vérification des alerts utilisateur vis à vis des venues / artists
 - Vérification des alerts de vente pour les concerts en favorites
@@ -85,53 +92,80 @@ Setlist potentielle / par artiste (via attractions name)
 - GET /healthz
   healthcheck serveur
 
-- GET /concerts?artistID=...&venueID=...
+- GET /api/concerts?artistID=...&venueID=...
   liste des concerts, avec filtre optionnel par artiste ou salle
 
-- GET /concerts/{concertId}
+- GET /api/concerts/{concertId}
   détail d'un concert
 
-- GET /artists?search=...
+- GET /api/artists?search=...
   autocomplétion artists -> id
 
-- GET /venues?search=...
+- GET /api/venues?search=...
   autocomplétion venues -> id
 
+- POST /api/auth/register
+  créer un compte email/password, ouvrir une session cookie
+
+- POST /api/auth/login
+  se connecter avec email/password
+
+- POST /api/auth/logout
+  révoquer la session courante
+
+- DELETE /api/auth/unregister
+  supprimer son compte, avec confirmation password
+
+- GET /api/auth/me
+  récupérer l'utilisateur connecté
+
+- GET /api/auth/email-exists?email=...
+  vérifier si un email existe
+
+- POST /api/auth/passkeys/register/begin
+  commencer l'ajout d'une passkey pour l'utilisateur connecté
+
+- POST /api/auth/passkeys/register/finish
+  valider et stocker la passkey créée
+
+- POST /api/auth/passkeys/login/begin
+  commencer une connexion passkey sans email
+
+- POST /api/auth/passkeys/login/finish
+  valider la passkey et ouvrir une session cookie
+
+- GET /api/auth/passkeys
+  lister les passkeys de l'utilisateur connecté
+
+- DELETE /api/auth/passkeys/{credentialId}
+  supprimer une passkey de l'utilisateur connecté
+
 ## Requêtes prévues
-- POST /auth/register  
-  créer un compte
-
-- POST /auth/login  
-  se connecter
-
-- POST /auth/logout  
-  se déconnecter
-
-- GET /concerts/{concertId}/sns  
+- GET /api/concerts/{concertId}/sns  
   voir les SNS des gens qui vont au même concert
 
-- GET /concerts/{concertId}/setlist  
+- GET /api/concerts/{concertId}/setlist  
   voir la setlist potentielle d'un concert
 
-- POST ou DELETE /concerts/{concertId}/favorites  
+- POST ou DELETE /api/concerts/{concertId}/favorites  
   ajouter ou retirer un favorite (active/désactive l'alert de vente)
 
-- POST ou DELETE /concerts/{concertId}/wt?type=wtb|wts  
+- POST ou DELETE /api/concerts/{concertId}/wt?type=wtb|wts  
   se mettre ou retirer en WTB ou WTS
 
-- GET /concerts/{concertId}/wt  
+- GET /api/concerts/{concertId}/wt  
   voir les WTB / WTS liés à un concert
 
-- POST /alerts?targetType=artist|venue&targetId=...
+- POST /api/alerts?targetType=artist|venue&targetId=...
   créer une alert de nouveauté
 
-- DELETE /alerts/{alertId}  
+- DELETE /api/alerts/{alertId}  
   retirer une alert
 
-- GET /me  
+- GET /api/me  
   voir le profil (sns, favorites, wt, alerts)
 
-- PATCH /me  
+- PATCH /api/me  
   modifier le profil (sns)
 
 ## Flux du Système
@@ -144,19 +178,21 @@ Setlist potentielle / par artiste (via attractions name)
 ## Description serveur
 - Backend Go avec `net/http`, `database/sql`
 - Démarrage : `server/main/main.go`.
-- Schéma : `server/main/schema.sql`, appliqué au lancement sur une DB fraîche
-- API : `server/api`, handlers pour `/concerts`, `/artists`, `/venues`, `/healthz`.
-- Sync Ticketmaster : `server/job/ticketmaster.go`, lancé au démarrage puis toutes les 15 minutes.
+- Schéma : `server/main/schema.sql`, appliqué au lancement après suppression de la DB existante. Pas de migration : quand le schéma change, la DB locale est écrasée au redémarrage.
+- API : `server/api`, handlers pour `/api/concerts`, `/api/artists`, `/api/venues`, `/healthz`.
+- Auth : email/password avec bcrypt, sessions serveur par cookie HttpOnly `session`, passkeys WebAuthn via `github.com/go-webauthn/webauthn`.
+- WebAuthn : domaine configuré dans `server/api/passkeys.go` pour `ticketmet.jessyfal04.dev`.
+- Sync Ticketmaster : `server/job/ticketmaster.go`, lancé dans une goroutine au démarrage puis toutes les 15 minutes.
 - Secrets : `.secrets/ticketmaster.mk`, chargé par le `Makefile`, ignoré par Git.
 - Déploiement : image Docker `docker.io/jessyfal04/ticketmet:latest`, DB persistée dans `/app/data/ticketmet.sqlite3`
-- Non implémenté pour l'instant : auth, profil, favorites, WTB/WTS, alerts, SNS, setlist.fm.
+- Non implémenté pour l'instant : profil, favorites, WTB/WTS, alerts, SNS, setlist.fm.
 
 ## Description client
 - Plan : application monopage avec sections Recherche, Fiche concert, Profil, Auth.
-- Recherche : liste + filtres ; appels `GET /concerts?artistID=...&venueID=...`, `GET /artists?search=...`, `GET /venues?search=...`.
-- Fiche concert : détails + setlist + SNS + WTB/WTS ; appels `GET /concerts/{concertId}`, `GET /concerts/{concertId}/setlist`, `GET /concerts/{concertId}/sns`, `GET /concerts/{concertId}/wt`, actions `POST/DELETE /concerts/{concertId}/favorites`, `POST/DELETE /concerts/{concertId}/wt`.
-- Profil : infos utilisateur et SNS ; appels `GET /me`, `PATCH /me`, création d'alerts via `POST /alerts`, suppression via `DELETE /alerts/{alertId}`.
-- Auth : écrans inscription/connexion/déconnexion ; appels `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`.
+- Recherche : liste + filtres ; appels `GET /api/concerts?artistID=...&venueID=...`, `GET /api/artists?search=...`, `GET /api/venues?search=...`.
+- Fiche concert : détails + setlist + SNS + WTB/WTS ; appels `GET /api/concerts/{concertId}`, `GET /api/concerts/{concertId}/setlist`, `GET /api/concerts/{concertId}/sns`, `GET /api/concerts/{concertId}/wt`, actions `POST/DELETE /api/concerts/{concertId}/favorites`, `POST/DELETE /api/concerts/{concertId}/wt`.
+- Profil : infos utilisateur et SNS ; appels `GET /api/me`, `PATCH /api/me`, création d'alerts via `POST /api/alerts`, suppression via `DELETE /api/alerts/{alertId}`.
+- Auth : écrans inscription/connexion/déconnexion ; appels `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, passkeys via `/api/auth/passkeys/...`.
 
 ## Autre Idées
-- Notification push via Firebase
+- Notification push via Firebase + Mail de bienvenue

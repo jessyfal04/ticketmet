@@ -3,10 +3,10 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 
-echo "GET /venues"
-curl -s "$BASE_URL/venues"
+echo "GET /api/venues"
+curl -s "$BASE_URL/api/venues"
 echo
 
-echo "GET /venues?search=Accor"
-curl -s "$BASE_URL/venues?search=Accor"
+echo "GET /api/venues?search=Accor"
+curl -s "$BASE_URL/api/venues?search=Accor"
 echo

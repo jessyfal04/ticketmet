@@ -31,6 +31,29 @@ func ScanConcert(row interface{ Scan(...any) error }) (Concert, error) {
 	return concert, nil
 }
 
+func ScanUser(row interface{ Scan(...any) error }) (User, error) {
+	var user User
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash)
+	return user, err
+}
+
+func ScanPasskey(row interface{ Scan(...any) error }) (Passkey, error) {
+	var passkey Passkey
+	err := row.Scan(&passkey.CredentialID, &passkey.PublicKey, &passkey.SignCount)
+	return passkey, err
+}
+
+func ScanPublicPasskey(row interface{ Scan(...any) error }) (PublicPasskey, error) {
+	passkey, err := ScanPasskey(row)
+	return passkey.Public(), err
+}
+
+func ScanWebAuthnChallenge(row interface{ Scan(...any) error }) (WebAuthnChallengeRow, error) {
+	var challenge WebAuthnChallengeRow
+	err := row.Scan(&challenge.ID, &challenge.SessionData)
+	return challenge, err
+}
+
 func parseTime(value string) time.Time {
 	if value == "" {
 		return time.Time{}

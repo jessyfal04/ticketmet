@@ -4,40 +4,41 @@ import (
 	"database/sql"
 	"net/http"
 	"server/model"
+	"strconv"
 )
 
+// Get a list of concerts, optionally filtered by artistID and/or venueID
 func handleConcerts(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	if r.Method != http.MethodGet {
-		httpMethodNotAllowedError(w)
-		return
-	}
+	// Get optional artistID and venueID query parameters
+	artistFilter := httpGetOptionalIntParam(r, "artistID")
+	venueFilter := httpGetOptionalIntParam(r, "venueID")
 
-	artistIDParam := r.URL.Query().Get("artistID")
-	venueIDParam := r.URL.Query().Get("venueID")
-
-	artistFilter := sqlOptionalInt(artistIDParam)
-	venueFilter := sqlOptionalInt(venueIDParam)
-
+	// Query concerts with optional filters
 	sqlQueryList(w, r, db, "concerts", `
-		SELECT id, name, date, venue_id, artist_id, url, photo_url, seatmap_url, sale_start_datetime
+		SELECT *
 		FROM concerts
 		WHERE (? IS NULL OR artist_id = ?) AND (? IS NULL OR venue_id = ?)
 		ORDER BY date`, model.ScanConcert, artistFilter, artistFilter, venueFilter, venueFilter)
 }
 
+// Get a concert by ID
 func handleConcertByID(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	if r.Method != http.MethodGet {
-		httpMethodNotAllowedError(w)
-		return
-	}
-
-	id, ok := pathIntParam(w, r, "/concerts/", "invalid concertID")
+	// Get the id parameter from the URL path
+	idParam, ok := httpGetParam(w, r, "id")
 	if !ok {
 		return
 	}
 
+	// Convert id to integer
+	id, err := strconv.Atoi(idParam)
+	if err != nil {
+		logHttpError(w, http.StatusBadRequest, "", nil)
+		return
+	}
+
+	// Query the concert by ID
 	sqlQueryOne(w, r, db, "concert", `
-		SELECT id, name, date, venue_id, artist_id, url, photo_url, seatmap_url, sale_start_datetime
+		SELECT *
 		FROM concerts
 		WHERE id = ?`, model.ScanConcert, id)
 }

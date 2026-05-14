@@ -40,6 +40,10 @@ func openDB(path string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, err
 	}
+	// Remove existing database to start fresh.
+	_ = os.Remove(path)
+	_ = os.Remove(path + "-shm")
+	_ = os.Remove(path + "-wal")
 
 	db, err := sql.Open("sqlite", path)
 	if err != nil {

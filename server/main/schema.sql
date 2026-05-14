@@ -26,7 +26,32 @@ CREATE TABLE IF NOT EXISTS concerts (
 
 CREATE TABLE IF NOT EXISTS users (
 	id INTEGER PRIMARY KEY,
-	username TEXT NOT NULL UNIQUE
+	email TEXT NOT NULL UNIQUE,
+	password_hash TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+	id INTEGER PRIMARY KEY,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	token_hash TEXT NOT NULL UNIQUE,
+	expires_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS webauthn_credentials (
+	id INTEGER PRIMARY KEY,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	credential_id TEXT NOT NULL UNIQUE,
+	public_key TEXT NOT NULL,
+	sign_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+	id INTEGER PRIMARY KEY,
+	user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+	token_hash TEXT NOT NULL UNIQUE,
+	kind TEXT NOT NULL CHECK (kind IN ('registration', 'login')),
+	session_data TEXT NOT NULL,
+	expires_at INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS user_sns (

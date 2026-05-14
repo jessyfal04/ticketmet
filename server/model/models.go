@@ -27,9 +27,40 @@ type Artist struct {
 }
 
 type User struct {
-	ID       int
-	Username string
-	SNS      []string
+	ID           int
+	Email        string
+	PasswordHash string
+	SNS          []string
+}
+
+type PublicUser struct {
+	ID    int
+	Email string
+}
+
+func (u User) Public() PublicUser {
+	return PublicUser{ID: u.ID, Email: u.Email}
+}
+
+type Passkey struct {
+	CredentialID string
+	PublicKey    string
+	SignCount    int
+}
+
+// PublicPasskey is the safe representation returned to the front-end.
+type PublicPasskey struct {
+	CredentialID string
+	SignCount    int
+}
+
+func (p Passkey) Public() PublicPasskey {
+	return PublicPasskey{CredentialID: p.CredentialID, SignCount: p.SignCount}
+}
+
+type WebAuthnChallengeRow struct {
+	ID          int
+	SessionData string
 }
 
 type WTType string
