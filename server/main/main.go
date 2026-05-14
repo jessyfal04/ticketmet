@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	_ "modernc.org/sqlite"
 	_ "embed"
 	"log"
 	"net/http"
@@ -10,6 +9,9 @@ import (
 	"path/filepath"
 
 	"server/api"
+	"server/job"
+
+	_ "modernc.org/sqlite"
 )
 
 //go:embed schema.sql
@@ -24,6 +26,8 @@ func main() {
 
 	clientDir := getenv("CLIENT_DIR", "../client")
 	mux := api.ServeMux(db, clientDir)
+
+	job.StartTicketmaster(db, os.Getenv("TICKETMASTER_API_KEY"))
 
 	addr := ":" + getenv("PORT", "8080")
 	log.Printf("Listening on %s", addr)

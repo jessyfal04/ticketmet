@@ -3,32 +3,33 @@ package model
 import "time"
 
 type Concert struct {
-	ID int
-	Name string
-	Date time.Time
-	VenueID int
-	ArtistID int
-	URL string
-	Photos []string
+	ID                int
+	Name              string
+	Date              time.Time
+	VenueID           int
+	ArtistID          int
+	URL               string
+	SeatmapURL        string
+	Photos            []string
 	SaleStartDateTime time.Time
 }
 
 type Venue struct {
-	ID int
-	Name string
-	City string
+	ID      int
+	Name    string
+	City    string
 	Country string
 }
 
 type Artist struct {
-	ID int
+	ID   int
 	Name string
 }
 
 type User struct {
-	ID int
+	ID       int
 	Username string
-	SNS []string
+	SNS      []string
 }
 
 type WTType string
@@ -39,26 +40,26 @@ const (
 )
 
 type WT struct {
-	UserID int
+	UserID    int
 	ConcertID int
-	Type WTType
+	Type      WTType
 }
 
 type Favorite struct {
-	UserID int
+	UserID    int
 	ConcertID int
 }
 
 type Alert struct {
-	AlertID int
-	UserID int
+	AlertID    int
+	UserID     int
 	TargetType string
-	TargetID int
+	TargetID   int
 }
 
 type Setlist struct {
 	ConcertID int
-	Songs []string
+	Songs     []string
 }
 
 type SyncTicketmaster struct {
@@ -66,13 +67,13 @@ type SyncTicketmaster struct {
 }
 
 type DataSet struct {
-	Venues []Venue
-	Artists []Artist
-	Concerts []Concert
-	Users []User
-	WTs []WT
+	Venues    []Venue
+	Artists   []Artist
+	Concerts  []Concert
+	Users     []User
+	WTs       []WT
 	Favorites []Favorite
-	Alerts []Alert
-	Setlists []Setlist
-	Sync SyncTicketmaster
+	Alerts    []Alert
+	Setlists  []Setlist
+	Sync      SyncTicketmaster
 }

@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS concerts (
 	venue_id INTEGER NOT NULL REFERENCES venues(id),
 	artist_id INTEGER NOT NULL REFERENCES artists(id),
 	url TEXT NOT NULL,
+	photo_url TEXT NOT NULL DEFAULT '',
+	seatmap_url TEXT NOT NULL DEFAULT '',
 	sale_start_datetime TEXT NOT NULL
 );
 

@@ -17,12 +17,16 @@ func ScanVenue(row interface{ Scan(...any) error }) (Venue, error) {
 func ScanConcert(row interface{ Scan(...any) error }) (Concert, error) {
 	var concert Concert
 	var date string
+	var photoURL string
 	var saleStart string
-	err := row.Scan(&concert.ID, &concert.Name, &date, &concert.VenueID, &concert.ArtistID, &concert.URL, &saleStart)
+	err := row.Scan(&concert.ID, &concert.Name, &date, &concert.VenueID, &concert.ArtistID, &concert.URL, &photoURL, &concert.SeatmapURL, &saleStart)
 	if err != nil {
 		return Concert{}, err
 	}
 	concert.Date = parseTime(date)
+	if photoURL != "" {
+		concert.Photos = []string{photoURL}
+	}
 	concert.SaleStartDateTime = parseTime(saleStart)
 	return concert, nil
 }

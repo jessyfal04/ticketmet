@@ -19,7 +19,7 @@ func handleConcerts(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	venueFilter := sqlOptionalInt(venueIDParam)
 
 	sqlQueryList(w, r, db, "concerts", `
-		SELECT id, name, date, venue_id, artist_id, url, sale_start_datetime
+		SELECT id, name, date, venue_id, artist_id, url, photo_url, seatmap_url, sale_start_datetime
 		FROM concerts
 		WHERE (? IS NULL OR artist_id = ?) AND (? IS NULL OR venue_id = ?)
 		ORDER BY date`, model.ScanConcert, artistFilter, artistFilter, venueFilter, venueFilter)
@@ -37,7 +37,7 @@ func handleConcertByID(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	}
 
 	sqlQueryOne(w, r, db, "concert", `
-		SELECT id, name, date, venue_id, artist_id, url, sale_start_datetime
+		SELECT id, name, date, venue_id, artist_id, url, photo_url, seatmap_url, sale_start_datetime
 		FROM concerts
 		WHERE id = ?`, model.ScanConcert, id)
 }
