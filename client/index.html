@@ -10,7 +10,7 @@
 	<script src="lib/script.js"></script>
 	<title>TicketMet</title>
 </head>
-<body class="has-background-light">
+<body>
 	<section class="hero is-info">
 		<div class="hero-body">
 			<p class="title">TicketMet</p>
@@ -18,237 +18,169 @@
 		</div>
 	</section>
 
-	<div id="messages" class="messages mx-4 mt-4"></div>
+	<div id="messages" class="mx-5 mt-4"></div>
 
-	<div class="box mx-6 mt-5">
-		<h2 class="title is-2">Auth</h2>
+	<div class="box mx-5 mt-5">
+		<h2 class="title is-2">Compte</h2>
 
-		<p class="is-size-5 if-login" style="display:none;">
-			Bonjour <strong id="txt-connexion-username"></strong>
-		</p>
+		<p class="is-size-5 if-login" style="display:none;">Connecté : <strong id="connectedEmail"></strong></p>
 		<p class="is-size-5 if-not-login">Veuillez vous connecter.</p>
 
 		<div class="block if-login" style="display:none;">
-			<button class="button is-danger is-medium" type="button" onclick="logout()">Se déconnecter</button>
+			<button class="button is-danger" type="button" onclick="logout()">Se déconnecter</button>
 		</div>
 
 		<div class="if-not-login">
 			<div class="columns">
 				<div class="column">
-					<div class="field">
-						<label class="label" for="authUsername">Username</label>
-						<div class="control">
-							<input class="input" type="text" id="authUsername" placeholder="alice">
-						</div>
-					</div>
+					<label class="label" for="email">Email</label>
+					<input class="input" type="email" id="email" placeholder="alice@example.com" onchange="emailExists()">
+					<p class="help" id="emailHelp">Minimum : un email valide.</p>
 				</div>
 				<div class="column">
-					<div class="field">
-						<label class="label" for="authPassword">Mot de passe</label>
-						<div class="control">
-							<input class="input" type="password" id="authPassword" placeholder="********">
-						</div>
-					</div>
-				</div>
-				<div class="column">
-					<div class="field">
-						<label class="label" for="authSNS">SNS</label>
-						<div class="control">
-							<input class="input" type="text" id="authSNS" placeholder="@alice, instagram.com/alice">
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<div class="field is-grouped">
-				<div class="control">
-					<button class="button is-link is-medium" type="button" onclick="login()">Login</button>
-				</div>
-				<div class="control">
-					<button class="button is-link is-medium is-outlined" type="button" onclick="register()">Register</button>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<div class="box mx-6">
-		<h2 class="title is-2">Recherche</h2>
-
-		<div class="columns">
-			<div class="column">
-				<div class="field">
-					<label class="label" for="artistSearch">Artiste</label>
-					<div class="field has-addons">
-						<div class="control is-expanded">
-							<input class="input" type="text" id="artistSearch" placeholder="NMIXX">
-						</div>
-						<div class="control">
-							<button class="button is-info" type="button" onclick="searchArtists()">Chercher</button>
-						</div>
-					</div>
-				</div>
-				<div class="field">
-					<div class="select is-fullwidth">
-						<select id="artistResults" onchange="selectArtist()">
-							<option value="">Tous les artists</option>
-						</select>
-					</div>
-				</div>
-			</div>
-
-			<div class="column">
-				<div class="field">
-					<label class="label" for="venueSearch">Salle</label>
-					<div class="field has-addons">
-						<div class="control is-expanded">
-							<input class="input" type="text" id="venueSearch" placeholder="Accor">
-						</div>
-						<div class="control">
-							<button class="button is-info" type="button" onclick="searchVenues()">Chercher</button>
-						</div>
-					</div>
-				</div>
-				<div class="field">
-					<div class="select is-fullwidth">
-						<select id="venueResults" onchange="selectVenue()">
-							<option value="">Toutes les venues</option>
-						</select>
-					</div>
-				</div>
-			</div>
-
-			<div class="column is-narrow is-flex is-align-items-flex-end pb-3">
-				<div class="buttons mb-0">
-					<button class="button is-success is-medium" type="button" onclick="loadConcerts()">Filtrer</button>
-					<button class="button is-warning is-medium is-light" type="button" onclick="clearSearch()">Reset</button>
-				</div>
-			</div>
-		</div>
-
-		<div class="block table-container">
-			<table class="table is-hoverable is-fullwidth">
-				<thead>
-					<tr>
-						<th>Concert</th>
-						<th>Date</th>
-						<th>Salle</th>
-						<th>Artiste</th>
-						<th>Actions</th>
-					</tr>
-				</thead>
-				<tbody id="concertsList"></tbody>
-			</table>
-		</div>
-	</div>
-
-	<div class="box mx-6">
-		<h2 class="title is-2">Fiche concert</h2>
-
-		<p id="noConcertText" class="is-size-5">Sélectionnez un concert depuis la recherche.</p>
-
-		<div id="concertDetails" style="display:none;">
-			<div class="columns">
-				<div class="column is-two-thirds">
-					<h3 class="title is-3" id="detailName"></h3>
-					<p class="is-size-5">
-						<span id="detailDate"></span><br>
-						<span id="detailVenue"></span><br>
-						<span id="detailArtist"></span>
-					</p>
-					<p class="mt-3">
-						<a id="detailURL" href="#" target="_blank" rel="noreferrer">Page de vente</a>
-					</p>
-				</div>
-				<div class="column">
-					<div id="detailPhotos" class="columns is-multiline is-mobile"></div>
+					<label class="label" for="password">Mot de passe</label>
+					<input class="input" type="password" id="password" minlength="8" placeholder="********">
+					<p class="help">Minimum 8 caractères.</p>
 				</div>
 			</div>
 
 			<div class="buttons">
-				<button class="button is-success" type="button" onclick="addFavorite()">Ajouter aux favorites</button>
-				<button class="button is-warning is-light" type="button" onclick="removeFavorite()">Retirer des favorites</button>
-				<button class="button is-link" type="button" onclick="setWT('wtb')">WTB</button>
-				<button class="button is-info" type="button" onclick="setWT('wts')">WTS</button>
-				<button class="button is-danger is-light" type="button" onclick="removeWT()">Retirer WT</button>
-			</div>
-
-			<div class="columns">
-				<div class="column">
-					<h4 class="title is-4">Setlist potentielle</h4>
-					<ul id="setlist" class="ml-4"></ul>
-				</div>
-				<div class="column">
-					<h4 class="title is-4">WTB / WTS</h4>
-					<div id="wtList" class="tags"></div>
-				</div>
-				<div class="column">
-					<h4 class="title is-4">SNS</h4>
-					<ul id="snsList" class="ml-4"></ul>
-				</div>
+				<button class="button is-link" type="button" id="loginButton" onclick="login()">Login</button>
+				<button class="button is-link is-outlined" type="button" id="registerButton" onclick="register()">Register</button>
+				<button class="button is-info is-light" type="button" onclick="loginPasskey()">Login passkey</button>
 			</div>
 		</div>
 	</div>
 
-	<div class="box mx-6">
-		<h2 class="title is-2">Profil</h2>
+	<div class="box mx-5">
+		<h2 class="title is-2">TicketMet</h2>
 
-		<p class="is-size-5 if-not-login">Vous devez être connecté pour gérer votre profil.</p>
+		<div class="buttons" id="viewButtons">
+			<button class="button is-link" id="button-searchView" type="button" onclick="showView('searchView')">Recherche</button>
+			<button class="button is-link is-outlined" id="button-detailView" type="button" onclick="showView('detailView')">Fiche concert</button>
+			<button class="button is-link is-outlined" id="button-profileView" type="button" onclick="showView('profileView')">Profil</button>
+		</div>
 
-		<div class="if-login" style="display:none;">
-			<div class="columns">
-				<div class="column">
-					<h3 class="title is-4">SNS</h3>
-					<div class="field has-addons">
-						<div class="control is-expanded">
-							<input class="input" type="text" id="profileSNS" placeholder="@alice, instagram.com/alice">
+		<div id="views">
+			<div id="searchView">
+				<div class="columns">
+					<div class="column">
+						<label class="label" for="artistSearch">Artiste</label>
+						<div class="field has-addons">
+							<div class="control is-expanded">
+								<input class="input" type="text" id="artistSearch" placeholder="NMIXX">
+							</div>
+							<div class="control">
+								<button class="button is-info" type="button" onclick="searchArtists()">Chercher</button>
+							</div>
 						</div>
-						<div class="control">
-							<button class="button is-success" type="button" onclick="patchMe()">Enregistrer</button>
+						<div class="select is-fullwidth">
+							<select id="artistResults" onchange="selectArtist()">
+								<option value="">Tous les artistes</option>
+							</select>
+						</div>
+					</div>
+
+					<div class="column">
+						<label class="label" for="venueSearch">Salle</label>
+						<div class="field has-addons">
+							<div class="control is-expanded">
+								<input class="input" type="text" id="venueSearch" placeholder="Accor">
+							</div>
+							<div class="control">
+								<button class="button is-info" type="button" onclick="searchVenues()">Chercher</button>
+							</div>
+						</div>
+						<div class="select is-fullwidth">
+							<select id="venueResults" onchange="selectVenue()">
+								<option value="">Toutes les salles</option>
+							</select>
 						</div>
 					</div>
 				</div>
 
-				<div class="column">
-					<h3 class="title is-4">Alerts nouveauté</h3>
-					<div class="field has-addons">
-						<div class="control">
-							<div class="select">
-								<select id="alertTargetType">
-									<option value="artist">Artiste</option>
-									<option value="venue">Salle</option>
-								</select>
-							</div>
+				<div class="buttons">
+					<button class="button is-success" type="button" onclick="loadConcerts()">Filtrer</button>
+					<button class="button is-warning is-light" type="button" onclick="clearSearch()">Reset</button>
+				</div>
+
+				<div class="table-container">
+					<table class="table is-hoverable is-fullwidth">
+						<thead>
+							<tr>
+								<th>Concert</th>
+								<th>Date</th>
+								<th>Salle</th>
+								<th>Artiste</th>
+								<th>Action</th>
+							</tr>
+						</thead>
+						<tbody id="concertsList"></tbody>
+					</table>
+				</div>
+			</div>
+
+			<div id="detailView" style="display:none;">
+				<p id="noConcertText" class="is-size-5">Sélectionnez un concert depuis la recherche.</p>
+
+				<div id="concertDetails" style="display:none;">
+					<div class="columns">
+						<div class="column is-two-thirds">
+							<h3 class="title is-3" id="detailName"></h3>
+							<p><strong>Date :</strong> <span id="detailDate"></span></p>
+							<p><strong>Vente :</strong> <span id="detailSale"></span></p>
+							<p><strong>Salle :</strong> <span id="detailVenue"></span></p>
+							<p><strong>Artiste :</strong> <span id="detailArtist"></span></p>
+							<p><a id="detailURL" href="#" target="_blank" rel="noreferrer">Page Ticketmaster</a></p>
+							<p><a id="detailSeatmap" href="#" target="_blank" rel="noreferrer">Plan de salle</a></p>
 						</div>
-						<div class="control is-expanded">
-							<input class="input" type="number" id="alertTargetID" placeholder="ID">
-						</div>
-						<div class="control">
-							<button class="button is-info" type="button" onclick="createAlert()">Créer</button>
+						<div class="column">
+							<figure class="image is-16by9">
+								<img id="detailPhoto" src="lib/concert.png" alt="Concert">
+							</figure>
 						</div>
 					</div>
-					<div class="field has-addons">
-						<div class="control is-expanded">
-							<input class="input" type="number" id="deleteAlertID" placeholder="ID alert">
+
+					<div class="buttons">
+						<button class="button is-success" type="button" onclick="todoFeature('favorites')">Ajouter aux favorites</button>
+						<button class="button is-link" type="button" onclick="todoFeature('WTB')">WTB</button>
+						<button class="button is-info" type="button" onclick="todoFeature('WTS')">WTS</button>
+					</div>
+
+					<div class="columns">
+						<div class="column">
+							<h4 class="title is-5">Setlist potentielle</h4>
+							<p class="has-text-grey">TODO backend : endpoint prévu dans le README.</p>
 						</div>
-						<div class="control">
-							<button class="button is-danger is-light" type="button" onclick="deleteAlert()">Supprimer</button>
+						<div class="column">
+							<h4 class="title is-5">WTB / WTS</h4>
+							<p class="has-text-grey">TODO backend : endpoint prévu dans le README.</p>
+						</div>
+						<div class="column">
+							<h4 class="title is-5">SNS</h4>
+							<p class="has-text-grey">TODO backend : endpoint prévu dans le README.</p>
 						</div>
 					</div>
 				</div>
 			</div>
 
-			<div class="columns">
-				<div class="column">
-					<h4 class="title is-5">Favorites</h4>
-					<div id="profileFavorites" class="tags"></div>
-				</div>
-				<div class="column">
-					<h4 class="title is-5">WTB / WTS</h4>
-					<div id="profileWT" class="tags"></div>
-				</div>
-				<div class="column">
-					<h4 class="title is-5">Alerts</h4>
-					<div id="profileAlerts" class="tags"></div>
+			<div id="profileView" style="display:none;">
+				<p class="is-size-5 if-not-login">Vous devez être connecté pour gérer votre profil.</p>
+
+				<div class="if-login" style="display:none;">
+					<h3 class="title is-4">Utilisateur</h3>
+					<p><strong>ID :</strong> <span id="profileID"></span></p>
+					<p><strong>Email :</strong> <span id="profileEmail"></span></p>
+
+					<h3 class="title is-4 mt-5">Passkeys</h3>
+					<div class="buttons">
+						<button class="button is-info" type="button" onclick="loadPasskeys()">Rafraîchir</button>
+						<button class="button is-success" type="button" onclick="registerPasskey()">Ajouter une passkey</button>
+					</div>
+					<div id="passkeysList" class="tags"></div>
+
+					<h3 class="title is-4 mt-5">SNS, favorites, WTB/WTS, alerts</h3>
+					<p class="has-text-grey">TODO backend : routes prévues dans le README, pas encore implémentées.</p>
 				</div>
 			</div>
 		</div>

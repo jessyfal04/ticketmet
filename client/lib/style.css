@@ -3,3 +3,13 @@
 	top: 0;
 	z-index: 20;
 }
+
+#messages {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+}
+
+#detailPhoto {
+	object-fit: cover;
+}

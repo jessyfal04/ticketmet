@@ -1,64 +1,43 @@
-const state = {
-	artists: [],
-	venues: [],
-	concerts: [],
-	currentConcert: null,
-	selectedArtistID: "",
-	selectedVenueID: "",
-	connected: false,
-	profile: null,
-	localSession: false,
-};
+let user = null;
+let artists = [];
+let venues = [];
+let concerts = [];
+let selectedArtistID = "";
+let selectedVenueID = "";
+let selectedConcert = null;
 
 $(function () {
-	const savedProfile = readLocalProfile();
-	if (savedProfile) {
-		state.profile = savedProfile;
-		toggleConnected(true, savedProfile.username || "local");
-	}
-
-	loadLookups();
+	showView("searchView");
+	checkSession();
 	loadConcerts();
 });
 
-function requestJSON(method, urls, data = {}) {
-	const list = Array.isArray(urls) ? urls : [urls];
-	const deferred = $.Deferred();
-	let index = 0;
+function api(method, url, data) {
+	let options = {
+		method: method,
+		url: url,
+		dataType: "json",
+	};
 
-	function attempt() {
-		$.ajax({
-			method: method,
-			url: list[index],
-			data: data,
-			dataType: "json",
-		})
-			.done(function (payload) {
-				deferred.resolve(payload);
-			})
-			.fail(function (xhr) {
-				index += 1;
-				if (index < list.length) {
-					attempt();
-				} else {
-					deferred.reject(xhr);
-				}
-			});
+	if (method == "GET") {
+		options.data = data || {};
+	} else if (data) {
+		options.data = JSON.stringify(data);
+		options.contentType = "application/json";
 	}
 
-	attempt();
-	return deferred.promise();
+	return $.ajax(options);
 }
 
 function setMessages(type, message) {
-	if (!type || !message) {
-		$("#messages").empty();
+	if (!message) {
+		$("#messages").html("");
 		return;
 	}
 
 	$("#messages").html(`
 		<div class="notification is-${type}">
-			<button class="delete" onclick="setMessages(null, null)"></button>
+			<button class="delete" onclick="setMessages('', '')"></button>
 			${escapeHTML(message)}
 		</div>
 	`);
@@ -68,8 +47,8 @@ function escapeHTML(value) {
 	return $("<div>").text(value == null ? "" : String(value)).html();
 }
 
-function field(obj, names, fallback = "") {
-	for (let i = 0; i < names.length; i += 1) {
+function field(obj, names, fallback) {
+	for (let i = 0; i < names.length; i = i + 1) {
 		if (obj && obj[names[i]] != null) {
 			return obj[names[i]];
 		}
@@ -81,622 +60,420 @@ function itemID(obj) {
 	return field(obj, ["ID", "id"], "");
 }
 
-function splitSNS(value) {
-	return String(value || "")
-		.split(",")
-		.map((entry) => entry.trim())
-		.filter((entry) => entry.length > 0);
-}
+function showView(viewID) {
+	$("#views").children().hide();
+	$("#" + viewID).show();
 
-function readLocalProfile() {
-	try {
-		const raw = localStorage.getItem("ticketmet.profile");
-		return raw ? JSON.parse(raw) : null;
-	} catch (e) {
-		return null;
-	}
-}
+	$("#viewButtons").children().addClass("is-outlined");
+	$("#button-" + viewID).removeClass("is-outlined");
 
-function saveLocalProfile() {
-	if (state.profile) {
-		localStorage.setItem("ticketmet.profile", JSON.stringify(state.profile));
-	}
-}
-
-function profileOrDefault(username, sns) {
-	return {
-		id: Date.now(),
-		username: username,
-		sns: sns,
-		favorites: [],
-		wts: [],
-		alerts: [],
-	};
-}
-
-function normalizeProfile(payload, fallback) {
-	const data = payload && (payload.data || payload.user || payload.User || payload);
-	return {
-		id: field(data, ["ID", "id"], field(fallback, ["id"], Date.now())),
-		username: field(data, ["Username", "username"], field(fallback, ["username"], "")),
-		sns: field(data, ["SNS", "sns"], field(fallback, ["sns"], [])),
-		favorites: field(data, ["Favorites", "favorites"], field(fallback, ["favorites"], [])),
-		wts: field(data, ["WTs", "wts", "WT", "wt"], field(fallback, ["wts"], [])),
-		alerts: field(data, ["Alerts", "alerts"], field(fallback, ["alerts"], [])),
-	};
-}
-
-function toggleConnected(connected, username = "") {
-	state.connected = connected;
-	$(".if-login").css("display", connected ? "" : "none");
-	$(".if-not-login").css("display", connected ? "none" : "");
-	$("#txt-connexion-username").text(username);
-
-	if (connected) {
-		loadProfile();
-	} else {
-		state.profile = null;
+	if (viewID == "profileView") {
 		renderProfile();
+		loadPasskeys();
 	}
 }
 
-function authPayload() {
-	return {
-		username: $("#authUsername").val().trim(),
-		password: $("#authPassword").val(),
-		sns: JSON.stringify(splitSNS($("#authSNS").val())),
-	};
-}
-
-function register() {
-	authAction("register");
+// Compte
+function checkSession() {
+	api("GET", "/api/auth/me")
+		.done(function (response) {
+			user = response.user;
+			toggleConnected(true);
+		})
+		.fail(function () {
+			user = null;
+			toggleConnected(false);
+		});
 }
 
 function login() {
-	authAction("login");
-}
+	let email = $("#email").val();
+	let password = $("#password").val();
 
-function authAction(action) {
-	const payload = authPayload();
-	if (!payload.username) {
-		setMessages("danger", "Username obligatoire.");
-		return;
-	}
-
-	requestJSON("POST", `/auth/${action}`, payload)
+	api("POST", "/api/auth/login", { email: email, password: password })
 		.done(function (response) {
-			state.localSession = false;
-			state.profile = normalizeProfile(response, profileOrDefault(payload.username, JSON.parse(payload.sns)));
-			saveLocalProfile();
-			toggleConnected(true, state.profile.username);
+			user = response.user;
+			toggleConnected(true);
 			setMessages("success", "Session ouverte.");
 		})
-		.fail(function () {
-			state.localSession = true;
-			state.profile = readLocalProfile() || profileOrDefault(payload.username, JSON.parse(payload.sns));
-			state.profile.username = payload.username;
-			if (splitSNS($("#authSNS").val()).length > 0) {
-				state.profile.sns = splitSNS($("#authSNS").val());
-			}
-			saveLocalProfile();
-			toggleConnected(true, state.profile.username);
-			setMessages("warning", "Auth serveur indisponible : session locale activée.");
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Connexion impossible."));
+		});
+}
+
+function register() {
+	let email = $("#email").val();
+	let password = $("#password").val();
+
+	api("POST", "/api/auth/register", { email: email, password: password })
+		.done(function (response) {
+			user = response.user;
+			toggleConnected(true);
+			setMessages("success", "Compte créé.");
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Inscription impossible."));
 		});
 }
 
 function logout() {
-	requestJSON("POST", "/auth/logout")
+	$.ajax({ method: "POST", url: "/api/auth/logout" })
 		.always(function () {
-			state.localSession = false;
+			user = null;
 			toggleConnected(false);
 			setMessages("success", "Session fermée.");
 		});
 }
 
-function loadLookups() {
-	requestJSON("GET", "/artists", { search: "" })
-		.done(function (artists) {
-			state.artists = Array.isArray(artists) ? artists : [];
-			renderArtistOptions(state.artists);
-		});
+function emailExists() {
+	let email = $("#email").val();
+	if (!email) return;
 
-	requestJSON("GET", "/venues", { search: "" })
-		.done(function (venues) {
-			state.venues = Array.isArray(venues) ? venues : [];
-			renderVenueOptions(state.venues);
+	api("GET", "/api/auth/email-exists", { email: email })
+		.done(function (response) {
+			if (response.exists) {
+				$("#emailHelp").text("Email déjà enregistré.");
+				$("#registerButton").prop("disabled", true);
+				$("#loginButton").prop("disabled", false);
+			} else {
+				$("#emailHelp").text("Email disponible.");
+				$("#registerButton").prop("disabled", false);
+				$("#loginButton").prop("disabled", true);
+			}
 		});
 }
 
-function mergeByID(target, items) {
-	const existing = {};
-	target.forEach((item) => {
-		existing[itemID(item)] = item;
-	});
-	items.forEach((item) => {
-		existing[itemID(item)] = item;
-	});
-	return Object.values(existing);
+function toggleConnected(connected) {
+	$(".if-login").css("display", connected ? "" : "none");
+	$(".if-not-login").css("display", connected ? "none" : "");
+	$("#connectedEmail").text(user ? user.Email : "");
+	renderProfile();
 }
 
+// Recherche
 function searchArtists() {
-	requestJSON("GET", "/artists", { search: $("#artistSearch").val() })
-		.done(function (artists) {
-			const results = Array.isArray(artists) ? artists : [];
-			state.artists = mergeByID(state.artists, results);
-			renderArtistOptions(results);
+	api("GET", "/api/artists", { search: $("#artistSearch").val() })
+		.done(function (response) {
+			artists = response || [];
+			renderArtists();
 		})
-		.fail(function () {
-			setMessages("danger", "Impossible de récupérer les artists.");
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Recherche artiste impossible."));
 		});
 }
 
 function searchVenues() {
-	requestJSON("GET", "/venues", { search: $("#venueSearch").val() })
-		.done(function (venues) {
-			const results = Array.isArray(venues) ? venues : [];
-			state.venues = mergeByID(state.venues, results);
-			renderVenueOptions(results);
+	api("GET", "/api/venues", { search: $("#venueSearch").val() })
+		.done(function (response) {
+			venues = response || [];
+			renderVenues();
 		})
-		.fail(function () {
-			setMessages("danger", "Impossible de récupérer les venues.");
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Recherche salle impossible."));
 		});
 }
 
-function renderArtistOptions(artists) {
-	const selected = state.selectedArtistID;
-	$("#artistResults").html(`<option value="">Tous les artists</option>`);
-	artists.forEach((artist) => {
-		const id = itemID(artist);
-		const name = field(artist, ["Name", "name"], "");
-		$("#artistResults").append(`<option value="${escapeHTML(id)}">${escapeHTML(name)} (#${escapeHTML(id)})</option>`);
-	});
-	$("#artistResults").val(selected);
+function renderArtists() {
+	$("#artistResults").html(`<option value="">Tous les artistes</option>`);
+	for (let i = 0; i < artists.length; i = i + 1) {
+		let artist = artists[i];
+		$("#artistResults").append(`
+			<option value="${escapeHTML(itemID(artist))}">
+				${escapeHTML(artist.Name)} (#${escapeHTML(itemID(artist))})
+			</option>
+		`);
+	}
+	$("#artistResults").val(selectedArtistID);
 }
 
-function renderVenueOptions(venues) {
-	const selected = state.selectedVenueID;
-	$("#venueResults").html(`<option value="">Toutes les venues</option>`);
-	venues.forEach((venue) => {
-		const id = itemID(venue);
-		const name = field(venue, ["Name", "name"], "");
-		const city = field(venue, ["City", "city"], "");
-		$("#venueResults").append(`<option value="${escapeHTML(id)}">${escapeHTML(name)} - ${escapeHTML(city)} (#${escapeHTML(id)})</option>`);
-	});
-	$("#venueResults").val(selected);
+function renderVenues() {
+	$("#venueResults").html(`<option value="">Toutes les salles</option>`);
+	for (let i = 0; i < venues.length; i = i + 1) {
+		let venue = venues[i];
+		$("#venueResults").append(`
+			<option value="${escapeHTML(itemID(venue))}">
+				${escapeHTML(venue.Name)} - ${escapeHTML(venue.City)} (#${escapeHTML(itemID(venue))})
+			</option>
+		`);
+	}
+	$("#venueResults").val(selectedVenueID);
 }
 
 function selectArtist() {
-	state.selectedArtistID = $("#artistResults").val();
+	selectedArtistID = $("#artistResults").val();
 	loadConcerts();
 }
 
 function selectVenue() {
-	state.selectedVenueID = $("#venueResults").val();
+	selectedVenueID = $("#venueResults").val();
 	loadConcerts();
 }
 
 function clearSearch() {
-	state.selectedArtistID = "";
-	state.selectedVenueID = "";
+	selectedArtistID = "";
+	selectedVenueID = "";
 	$("#artistSearch").val("");
 	$("#venueSearch").val("");
-	loadLookups();
+	artists = [];
+	venues = [];
+	renderArtists();
+	renderVenues();
 	loadConcerts();
 }
 
 function loadConcerts() {
-	const data = {};
-	if (state.selectedArtistID) {
-		data.artistID = state.selectedArtistID;
-	}
-	if (state.selectedVenueID) {
-		data.venueID = state.selectedVenueID;
-	}
+	let params = {};
+	if (selectedArtistID) params.artistID = selectedArtistID;
+	if (selectedVenueID) params.venueID = selectedVenueID;
 
-	requestJSON("GET", "/concerts", data)
-		.done(function (concerts) {
-			state.concerts = Array.isArray(concerts) ? concerts : [];
+	api("GET", "/api/concerts", params)
+		.done(function (response) {
+			concerts = response || [];
 			renderConcerts();
 		})
-		.fail(function () {
-			$("#concertsList").html(`<tr><td colspan="5">Impossible de charger les concerts.</td></tr>`);
+		.fail(function (xhr) {
+			$("#concertsList").html(`<tr><td colspan="5">${escapeHTML(errorText(xhr, "Impossible de charger les concerts."))}</td></tr>`);
 		});
 }
 
 function renderConcerts() {
-	if (state.concerts.length === 0) {
+	if (concerts.length == 0) {
 		$("#concertsList").html(`<tr><td colspan="5">Aucun concert.</td></tr>`);
 		return;
 	}
 
-	$("#concertsList").empty();
-	state.concerts.forEach((concert) => {
-		const id = itemID(concert);
-		const name = field(concert, ["Name", "name"], "");
-		const date = formatDate(field(concert, ["Date", "date"], ""));
-		const venueID = field(concert, ["VenueID", "venueID"], "");
-		const artistID = field(concert, ["ArtistID", "artistID"], "");
-
+	$("#concertsList").html("");
+	for (let i = 0; i < concerts.length; i = i + 1) {
+		let concert = concerts[i];
+		let id = itemID(concert);
 		$("#concertsList").append(`
 			<tr>
-				<td>${escapeHTML(name)}</td>
-				<td>${escapeHTML(date)}</td>
-				<td>${escapeHTML(venueName(venueID))}</td>
-				<td>${escapeHTML(artistName(artistID))}</td>
-				<td>
-					<button class="button is-info is-small" type="button" onclick="openConcert('${escapeHTML(id)}')">Ouvrir</button>
-				</td>
+				<td>${escapeHTML(concert.Name)}</td>
+				<td>${escapeHTML(formatDate(concert.Date))}</td>
+				<td>${escapeHTML(nameFromList(venues, concert.VenueID, "salle"))}</td>
+				<td>${escapeHTML(nameFromList(artists, concert.ArtistID, "artiste"))}</td>
+				<td><button class="button is-info is-small" type="button" onclick="openConcert('${escapeHTML(id)}')">Ouvrir</button></td>
 			</tr>
 		`);
-	});
+	}
 }
 
 function openConcert(id) {
-	requestJSON("GET", `/concerts/${id}`)
-		.done(function (concert) {
-			state.currentConcert = concert;
-			renderConcertDetail(concert);
-			loadConcertExtras(id);
+	api("GET", "/api/concerts/" + id)
+		.done(function (response) {
+			selectedConcert = response;
+			renderConcert();
+			showView("detailView");
 		})
-		.fail(function () {
-			const fallback = state.concerts.find((concert) => String(itemID(concert)) === String(id));
-			if (!fallback) {
-				setMessages("danger", "Concert introuvable.");
-				return;
-			}
-			state.currentConcert = fallback;
-			renderConcertDetail(fallback);
-			loadConcertExtras(id);
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Concert introuvable."));
 		});
 }
 
-function renderConcertDetail(concert) {
-	const id = itemID(concert);
-	const name = field(concert, ["Name", "name"], "");
-	const date = formatDate(field(concert, ["Date", "date"], ""));
-	const saleStart = formatDate(field(concert, ["SaleStartDateTime", "saleStartDateTime"], ""));
-	const venueID = field(concert, ["VenueID", "venueID"], "");
-	const artistID = field(concert, ["ArtistID", "artistID"], "");
-	const url = field(concert, ["URL", "url"], "#");
-	const photos = field(concert, ["Photos", "photos"], []);
+function renderConcert() {
+	if (!selectedConcert) {
+		$("#noConcertText").show();
+		$("#concertDetails").hide();
+		return;
+	}
 
 	$("#noConcertText").hide();
 	$("#concertDetails").show();
-	$("#detailName").text(name);
-	$("#detailDate").text(`Concert : ${date}${saleStart ? " | Vente : " + saleStart : ""}`);
-	$("#detailVenue").text(`Salle : ${venueName(venueID)}`);
-	$("#detailArtist").text(`Artiste : ${artistName(artistID)}`);
-	$("#detailURL").attr("href", url || "#");
-	$("#detailPhotos").empty();
+	$("#detailName").text(selectedConcert.Name);
+	$("#detailDate").text(formatDate(selectedConcert.Date));
+	$("#detailSale").text(formatDate(selectedConcert.SaleStartDateTime) || "Non renseignée");
+	$("#detailVenue").text(nameFromList(venues, selectedConcert.VenueID, "salle"));
+	$("#detailArtist").text(nameFromList(artists, selectedConcert.ArtistID, "artiste"));
+	$("#detailURL").attr("href", selectedConcert.URL || "#");
+	$("#detailSeatmap").attr("href", selectedConcert.SeatmapURL || "#");
 
-	photos.forEach((photo) => {
-		$("#detailPhotos").append(`
-			<div class="column is-half">
-				<figure class="image is-16by9">
-					<img class="is-rounded" src="${escapeHTML(photo)}" alt="${escapeHTML(name)}">
-				</figure>
-			</div>
-		`);
-	});
-	if (photos.length === 0) {
-		$("#detailPhotos").append(`<div class="column"><div class="notification is-light">Pas de photo.</div></div>`);
+	let photo = "lib/concert.png";
+	if (selectedConcert.Photos && selectedConcert.Photos.length > 0) {
+		photo = selectedConcert.Photos[0];
 	}
-
-	$("#detailName").attr("data-concert-id", id);
+	$("#detailPhoto").attr("src", photo);
 }
 
-function loadConcertExtras(id) {
-	requestJSON("GET", `/concerts/${id}/setlist`)
-		.done(function (payload) {
-			renderSetlist(field(payload, ["Songs", "songs"], Array.isArray(payload) ? payload : []));
-		})
-		.fail(function () {
-			renderSetlist([]);
-		});
-
-	requestJSON("GET", `/concerts/${id}/wt`)
-		.done(function (payload) {
-			renderWT(Array.isArray(payload) ? payload : field(payload, ["WTs", "wts"], []));
-		})
-		.fail(function () {
-			const localWT = state.profile ? state.profile.wts.filter((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], "")) === String(id)) : [];
-			renderWT(localWT);
-		});
-
-	requestJSON("GET", `/concerts/${id}/sns`)
-		.done(function (payload) {
-			renderSNS(Array.isArray(payload) ? payload : field(payload, ["SNS", "sns", "users"], []));
-		})
-		.fail(function () {
-			const sns = state.profile && isFavorite(id) ? state.profile.sns : [];
-			renderSNS(sns);
-		});
-}
-
-function renderSetlist(songs) {
-	$("#setlist").empty();
-	if (!songs || songs.length === 0) {
-		$("#setlist").append(`<li>Setlist indisponible.</li>`);
-		return;
-	}
-	songs.forEach((song) => {
-		$("#setlist").append(`<li>${escapeHTML(song)}</li>`);
-	});
-}
-
-function renderWT(entries) {
-	$("#wtList").empty();
-	if (!entries || entries.length === 0) {
-		$("#wtList").append(`<span class="tag is-light">Aucun WT</span>`);
-		return;
-	}
-	entries.forEach((entry) => {
-		const type = field(entry, ["Type", "type", "wtType"], "");
-		const userID = field(entry, ["UserID", "userID", "userId"], "");
-		$("#wtList").append(`<span class="tag is-link is-light">${escapeHTML(type)} utilisateur #${escapeHTML(userID)}</span>`);
-	});
-}
-
-function renderSNS(entries) {
-	$("#snsList").empty();
-	if (!entries || entries.length === 0) {
-		$("#snsList").append(`<li>Aucun SNS visible.</li>`);
-		return;
-	}
-	entries.forEach((entry) => {
-		if (typeof entry === "string") {
-			$("#snsList").append(`<li>${escapeHTML(entry)}</li>`);
-			return;
-		}
-		const username = field(entry, ["Username", "username"], "utilisateur");
-		const sns = field(entry, ["SNS", "sns"], []);
-		$("#snsList").append(`<li>${escapeHTML(username)} : ${escapeHTML(sns.join(", "))}</li>`);
-	});
-}
-
-function addFavorite() {
-	const id = currentConcertID();
-	if (!requireLogin() || !id) return;
-
-	requestJSON("POST", `/concerts/${id}/favorites`)
-		.done(function () {
-			setMessages("success", "Favorite ajouté.");
-			loadProfile();
-		})
-		.fail(function () {
-			if (!isFavorite(id)) {
-				state.profile.favorites.push({ concertId: id });
-			}
-			saveLocalProfile();
-			renderProfile();
-			loadConcertExtras(id);
-			setMessages("warning", "Endpoint favorites indisponible : favorite conservé localement.");
-		});
-}
-
-function removeFavorite() {
-	const id = currentConcertID();
-	if (!requireLogin() || !id) return;
-
-	requestJSON("DELETE", `/concerts/${id}/favorites`)
-		.done(function () {
-			setMessages("success", "Favorite retiré.");
-			loadProfile();
-		})
-		.fail(function () {
-			state.profile.favorites = state.profile.favorites.filter((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], entry)) !== String(id));
-			saveLocalProfile();
-			renderProfile();
-			loadConcertExtras(id);
-			setMessages("warning", "Endpoint favorites indisponible : favorite retiré localement.");
-		});
-}
-
-function setWT(type) {
-	const id = currentConcertID();
-	if (!requireLogin() || !id) return;
-
-	requestJSON("POST", `/concerts/${id}/wt`, { type: type })
-		.done(function () {
-			setMessages("success", "WT mis à jour.");
-			loadProfile();
-			loadConcertExtras(id);
-		})
-		.fail(function () {
-			state.profile.wts = state.profile.wts.filter((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], "")) !== String(id));
-			state.profile.wts.push({ userId: state.profile.id, concertId: id, type: type });
-			saveLocalProfile();
-			renderProfile();
-			loadConcertExtras(id);
-			setMessages("warning", "Endpoint WT indisponible : WT conservé localement.");
-		});
-}
-
-function removeWT() {
-	const id = currentConcertID();
-	if (!requireLogin() || !id) return;
-
-	requestJSON("DELETE", `/concerts/${id}/wt`)
-		.done(function () {
-			setMessages("success", "WT retiré.");
-			loadProfile();
-			loadConcertExtras(id);
-		})
-		.fail(function () {
-			state.profile.wts = state.profile.wts.filter((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], "")) !== String(id));
-			saveLocalProfile();
-			renderProfile();
-			loadConcertExtras(id);
-			setMessages("warning", "Endpoint WT indisponible : WT retiré localement.");
-		});
-}
-
-function loadProfile() {
-	if (!state.connected) return;
-
-	requestJSON("GET", "/me")
-		.done(function (payload) {
-			state.profile = normalizeProfile(payload, state.profile);
-			saveLocalProfile();
-			renderProfile();
-		})
-		.fail(function () {
-			state.profile = state.profile || readLocalProfile() || profileOrDefault($("#authUsername").val() || "local", []);
-			renderProfile();
-		});
-}
-
-function patchMe() {
-	if (!requireLogin()) return;
-
-	const sns = splitSNS($("#profileSNS").val());
-	requestJSON("PATCH", "/me", { sns: JSON.stringify(sns) })
-		.done(function () {
-			state.profile.sns = sns;
-			saveLocalProfile();
-			renderProfile();
-			setMessages("success", "Profil mis à jour.");
-		})
-		.fail(function () {
-			state.profile.sns = sns;
-			saveLocalProfile();
-			renderProfile();
-			setMessages("warning", "Endpoint profil indisponible : SNS conservés localement.");
-		});
-}
-
-function createAlert() {
-	if (!requireLogin()) return;
-
-	const targetType = $("#alertTargetType").val();
-	const targetID = $("#alertTargetID").val();
-	if (!targetID) {
-		setMessages("danger", "ID target obligatoire.");
-		return;
-	}
-
-	requestJSON("POST", "/alerts", { targetType: targetType, targetId: targetID })
-		.done(function () {
-			setMessages("success", "Alert créée.");
-			loadProfile();
-		})
-		.fail(function () {
-			const alert = {
-				alertId: Date.now(),
-				userId: state.profile.id,
-				targetType: targetType,
-				targetId: Number(targetID),
-			};
-			state.profile.alerts.push(alert);
-			saveLocalProfile();
-			renderProfile();
-			setMessages("warning", "Endpoint alerts indisponible : alert conservée localement.");
-		});
-}
-
-function deleteAlert() {
-	if (!requireLogin()) return;
-
-	const alertID = $("#deleteAlertID").val();
-	if (!alertID) {
-		setMessages("danger", "ID alert obligatoire.");
-		return;
-	}
-
-	requestJSON("DELETE", `/alerts/${alertID}`)
-		.done(function () {
-			setMessages("success", "Alert supprimée.");
-			loadProfile();
-		})
-		.fail(function () {
-			state.profile.alerts = state.profile.alerts.filter((entry) => String(field(entry, ["AlertID", "alertID", "alertId", "id"], "")) !== String(alertID));
-			saveLocalProfile();
-			renderProfile();
-			setMessages("warning", "Endpoint alerts indisponible : alert supprimée localement.");
-		});
-}
-
+// Profil et passkeys
 function renderProfile() {
-	if (!state.profile) {
-		$("#profileSNS").val("");
-		$("#profileFavorites").empty();
-		$("#profileWT").empty();
-		$("#profileAlerts").empty();
+	if (!user) {
+		$("#profileID").text("");
+		$("#profileEmail").text("");
+		$("#passkeysList").html("");
 		return;
 	}
 
-	$("#profileSNS").val((state.profile.sns || []).join(", "));
-	renderTags("#profileFavorites", state.profile.favorites, function (entry) {
-		const id = field(entry, ["ConcertID", "concertID", "concertId"], entry);
-		return `concert #${id}`;
-	});
-	renderTags("#profileWT", state.profile.wts, function (entry) {
-		const id = field(entry, ["ConcertID", "concertID", "concertId"], "");
-		const type = field(entry, ["Type", "type", "wtType"], "");
-		return `${type} concert #${id}`;
-	});
-	renderTags("#profileAlerts", state.profile.alerts, function (entry) {
-		const id = field(entry, ["AlertID", "alertID", "alertId", "id"], "");
-		const targetType = field(entry, ["TargetType", "targetType"], "");
-		const targetID = field(entry, ["TargetID", "targetID", "targetId"], "");
-		return `alert #${id} ${targetType} #${targetID}`;
-	});
+	$("#profileID").text(user.ID);
+	$("#profileEmail").text(user.Email);
 }
 
-function renderTags(selector, entries, labelFn) {
-	$(selector).empty();
-	if (!entries || entries.length === 0) {
-		$(selector).append(`<span class="tag is-light">Vide</span>`);
+function loadPasskeys() {
+	if (!user) return;
+
+	api("GET", "/api/auth/passkeys")
+		.done(function (response) {
+			let passkeys = response.passkeys || [];
+			$("#passkeysList").html("");
+
+			if (passkeys.length == 0) {
+				$("#passkeysList").append(`<span class="tag is-light">Aucune passkey</span>`);
+				return;
+			}
+
+			for (let i = 0; i < passkeys.length; i = i + 1) {
+				let passkey = passkeys[i];
+				let id = passkey.CredentialID;
+				$("#passkeysList").append(`
+					<span class="tag is-info is-light">
+						${escapeHTML(id.substring(0, 18))}...
+						<button class="delete is-small" onclick="deletePasskey('${escapeHTML(id)}')"></button>
+					</span>
+				`);
+			}
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Impossible de lister les passkeys."));
+		});
+}
+
+function deletePasskey(id) {
+	api("DELETE", "/api/auth/passkeys/" + encodeURIComponent(id))
+		.done(function () {
+			loadPasskeys();
+			setMessages("success", "Passkey supprimée.");
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Suppression passkey impossible."));
+		});
+}
+
+function registerPasskey() {
+	if (!window.PublicKeyCredential) {
+		setMessages("danger", "Navigateur incompatible avec les passkeys.");
 		return;
 	}
-	entries.forEach((entry) => {
-		$(selector).append(`<span class="tag is-info is-light">${escapeHTML(labelFn(entry))}</span>`);
-	});
+
+	api("POST", "/api/auth/passkeys/register/begin")
+		.done(function (options) {
+			options.publicKey.challenge = base64ToBuffer(options.publicKey.challenge);
+			options.publicKey.user.id = base64ToBuffer(options.publicKey.user.id);
+			navigator.credentials.create(options)
+				.then(function (credential) {
+					return api("POST", "/api/auth/passkeys/register/finish", credentialToJSON(credential));
+				})
+				.then(function () {
+					loadPasskeys();
+					setMessages("success", "Passkey ajoutée.");
+				})
+				.catch(function () {
+					setMessages("danger", "Création passkey annulée ou refusée.");
+				});
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Démarrage passkey impossible."));
+		});
 }
 
-function currentConcertID() {
-	if (!state.currentConcert) {
-		setMessages("danger", "Aucun concert sélectionné.");
-		return "";
+function loginPasskey() {
+	if (!window.PublicKeyCredential) {
+		setMessages("danger", "Navigateur incompatible avec les passkeys.");
+		return;
 	}
-	return itemID(state.currentConcert);
+
+	api("POST", "/api/auth/passkeys/login/begin")
+		.done(function (options) {
+			options.publicKey.challenge = base64ToBuffer(options.publicKey.challenge);
+			if (options.publicKey.allowCredentials) {
+				for (let i = 0; i < options.publicKey.allowCredentials.length; i = i + 1) {
+					options.publicKey.allowCredentials[i].id = base64ToBuffer(options.publicKey.allowCredentials[i].id);
+				}
+			}
+			navigator.credentials.get(options)
+				.then(function (credential) {
+					return api("POST", "/api/auth/passkeys/login/finish", credentialToJSON(credential));
+				})
+				.then(function (response) {
+					user = response.user;
+					toggleConnected(true);
+					setMessages("success", "Session passkey ouverte.");
+				})
+				.catch(function () {
+					setMessages("danger", "Connexion passkey annulée ou refusée.");
+				});
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Démarrage passkey impossible."));
+		});
 }
 
-function requireLogin() {
-	if (!state.connected || !state.profile) {
-		setMessages("danger", "Connexion requise.");
-		return false;
+function credentialToJSON(credential) {
+	let response = credential.response;
+	let json = {
+		id: credential.id,
+		rawId: bufferToBase64(credential.rawId),
+		type: credential.type,
+		response: {},
+	};
+
+	if (response.clientDataJSON) json.response.clientDataJSON = bufferToBase64(response.clientDataJSON);
+	if (response.attestationObject) json.response.attestationObject = bufferToBase64(response.attestationObject);
+	if (response.authenticatorData) json.response.authenticatorData = bufferToBase64(response.authenticatorData);
+	if (response.signature) json.response.signature = bufferToBase64(response.signature);
+	if (response.userHandle) json.response.userHandle = bufferToBase64(response.userHandle);
+
+	return json;
+}
+
+function base64ToBuffer(value) {
+	let base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+	let raw = window.atob(base64);
+	let buffer = new ArrayBuffer(raw.length);
+	let bytes = new Uint8Array(buffer);
+	for (let i = 0; i < raw.length; i = i + 1) {
+		bytes[i] = raw.charCodeAt(i);
 	}
-	return true;
+	return buffer;
 }
 
-function isFavorite(concertID) {
-	if (!state.profile) return false;
-	return state.profile.favorites.some((entry) => String(field(entry, ["ConcertID", "concertID", "concertId"], entry)) === String(concertID));
+function bufferToBase64(buffer) {
+	let bytes = new Uint8Array(buffer);
+	let text = "";
+	for (let i = 0; i < bytes.length; i = i + 1) {
+		text = text + String.fromCharCode(bytes[i]);
+	}
+	return window.btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-function artistName(id) {
-	const artist = state.artists.find((entry) => String(itemID(entry)) === String(id));
-	return artist ? field(artist, ["Name", "name"], `artist #${id}`) : `artist #${id}`;
-}
-
-function venueName(id) {
-	const venue = state.venues.find((entry) => String(itemID(entry)) === String(id));
-	if (!venue) return `venue #${id}`;
-	const name = field(venue, ["Name", "name"], "");
-	const city = field(venue, ["City", "city"], "");
-	return city ? `${name}, ${city}` : name;
+// Petits utilitaires
+function nameFromList(list, id, label) {
+	for (let i = 0; i < list.length; i = i + 1) {
+		if (String(itemID(list[i])) == String(id)) {
+			return list[i].Name;
+		}
+	}
+	return label + " #" + id;
 }
 
 function formatDate(value) {
-	if (!value) return "";
-	const parsed = new Date(value);
-	if (Number.isNaN(parsed.getTime())) return String(value);
-	return parsed.toLocaleString("fr-FR", {
+	if (!value || value == "0001-01-01T00:00:00Z") return "";
+	let date = new Date(value);
+	if (Number.isNaN(date.getTime())) return String(value);
+	return date.toLocaleString("fr-FR", {
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",
 		hour: "2-digit",
 		minute: "2-digit",
 	});
+}
+
+function errorText(xhr, fallback) {
+	if (xhr && xhr.responseText) {
+		return xhr.responseText.trim();
+	}
+	return fallback;
+}
+
+function todoFeature(name) {
+	setMessages("warning", name + " : route prévue dans le README, pas encore implémentée côté backend.");
 }
