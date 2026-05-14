@@ -30,78 +30,17 @@
 	<div id="messages" class="mx-5 mt-4"></div>
 
 	<div class="box mx-5 mt-5">
-		<h2 class="title is-3">Account</h2>
-
 		<p class="is-size-5 if-login" style="display:none;">Signed in as <strong id="connectedEmail"></strong></p>
-		<p class="is-size-5 if-not-login">Sign in or create an account.</p>
-
-		<div class="if-not-login">
-			<div class="columns">
-				<div class="column">
-					<label class="label" for="email">Email</label>
-					<input class="input" type="email" id="email" placeholder="alice@example.com" onchange="emailExists()">
-					<p class="help" id="emailHelp">Use a valid email address.</p>
-				</div>
-				<div class="column">
-					<label class="label" for="password">Password</label>
-					<input class="input" type="password" id="password" minlength="8" placeholder="********">
-					<p class="help">Minimum 8 characters.</p>
-				</div>
-			</div>
-
-			<div class="buttons">
-				<button class="button is-link" type="button" id="loginButton" onclick="login()">Sign in</button>
-				<button class="button is-link is-outlined" type="button" id="registerButton" onclick="register()">Register</button>
-				<button class="button is-info is-light" type="button" onclick="loginPasskey()">Sign in with passkey</button>
-			</div>
-		</div>
-
-		<div class="if-login" style="display:none;">
-			<div class="columns mt-4">
-				<div class="column">
-					<h3 class="title is-5">Profile</h3>
-					<p><strong>ID:</strong> <span id="accountID"></span></p>
-					<p><strong>Email:</strong> <span id="accountEmail"></span></p>
-				</div>
-				<div class="column">
-					<h3 class="title is-5">Passkeys</h3>
-					<div class="buttons">
-						<button class="button is-info is-light" type="button" onclick="loadPasskeys()">Refresh</button>
-						<button class="button is-success" type="button" onclick="registerPasskey()">Add passkey</button>
-					</div>
-					<div id="passkeysList" class="tags are-medium"></div>
-				</div>
-			</div>
-
-			<hr>
-
-			<div class="columns">
-				<div class="column">
-					<h3 class="title is-5">Session</h3>
-					<button class="button is-warning is-light" type="button" onclick="logout()">Sign out</button>
-				</div>
-				<div class="column">
-					<h3 class="title is-5">Danger zone</h3>
-					<div class="field has-addons">
-						<div class="control is-expanded">
-							<input class="input" type="password" id="unregisterPassword" placeholder="Current password">
-						</div>
-						<div class="control">
-							<button class="button is-danger" type="button" onclick="unregisterAccount()">Delete account</button>
-						</div>
-					</div>
-					<p class="help">Required by the backend before unregistering.</p>
-				</div>
-			</div>
-		</div>
+		<p class="is-size-5 if-not-login">Not signed in.</p>
 	</div>
 
 	<div class="box mx-5">
-		<h2 class="title is-3">Concerts</h2>
+		<h2 class="title is-3">TicketMet</h2>
 
 		<div class="buttons" id="viewButtons">
-			<button class="button is-link" id="button-searchView" type="button" onclick="showView('searchView')">Search</button>
-			<button class="button is-link is-outlined" id="button-detailView" type="button" onclick="showView('detailView')">Concert details</button>
+			<button class="button is-link is-outlined" id="button-accountView" type="button" onclick="showView('accountView')">Account</button>
+			<button class="button is-link is-outlined" id="button-searchView" type="button" onclick="showView('searchView')">Search</button>
+			<button class="button is-link" id="button-detailView" style="display:none;" type="button" onclick="showView('detailView')">Concert</button>
 		</div>
 
 		<div id="views">
@@ -163,13 +102,80 @@
 				</div>
 			</div>
 
+			<div id="accountView" style="display:none;">
+				<div class="if-not-login">
+					<h3 class="title is-4">Sign in</h3>
+
+					<div class="columns">
+						<div class="column">
+							<label class="label" for="email">Email</label>
+							<input class="input" type="email" id="email" placeholder="alice@example.com" onchange="emailExists()">
+							<p class="help" id="emailHelp">Use a valid email address.</p>
+						</div>
+						<div class="column">
+							<label class="label" for="password">Password</label>
+							<input class="input" type="password" id="password" minlength="8" placeholder="********">
+							<p class="help">Minimum 8 characters.</p>
+						</div>
+					</div>
+
+					<div class="buttons">
+						<button class="button is-link" type="button" id="loginButton" onclick="login()">Sign in</button>
+						<button class="button is-link is-outlined" type="button" id="registerButton" onclick="register()">Register</button>
+						<button class="button is-info is-light" type="button" onclick="loginPasskey()">Sign in with passkey</button>
+					</div>
+				</div>
+
+				<div class="if-login" style="display:none;">
+					<div class="columns">
+						<div class="column">
+							<h3 class="title is-5">Profile</h3>
+							<p><strong>ID:</strong> <span id="accountID"></span></p>
+							<p><strong>Email:</strong> <span id="accountEmail"></span></p>
+							<div class="buttons mt-4">
+								<button class="button is-warning is-light" type="button" onclick="logout()">Sign out</button>
+							</div>
+						</div>
+						<div class="column">
+							<h3 class="title is-5">Passkeys</h3>
+							<div class="buttons">
+								<button class="button is-info is-light" type="button" onclick="loadPasskeys()">Refresh</button>
+								<button class="button is-success" type="button" onclick="registerPasskey()">Add passkey</button>
+							</div>
+							<div id="passkeysList" class="tags are-medium"></div>
+						</div>
+					</div>
+
+					<hr>
+
+					<h3 class="title is-5">Danger zone</h3>
+					<div class="field has-addons">
+						<div class="control is-expanded">
+							<input class="input" type="password" id="unregisterPassword" placeholder="Current password">
+						</div>
+						<div class="control">
+							<button class="button is-danger" type="button" onclick="unregisterAccount()">Delete account</button>
+						</div>
+					</div>
+					<p class="help">Required by the backend before unregistering.</p>
+				</div>
+			</div>
+
 			<div id="detailView" style="display:none;">
 				<p id="noConcertText" class="is-size-5">Select a concert from the search results.</p>
 
 				<div id="concertDetails" style="display:none;">
+					<div class="level">
+						<div class="level-left">
+							<h3 class="title is-3 mb-0" id="detailName"></h3>
+						</div>
+						<div class="level-right">
+							<button class="button is-light" type="button" onclick="closeConcert()">Back to search</button>
+						</div>
+					</div>
+
 					<div class="columns">
 						<div class="column is-two-thirds">
-							<h3 class="title is-3" id="detailName"></h3>
 							<p><strong>Date:</strong> <span id="detailDate"></span></p>
 							<p><strong>Sale:</strong> <span id="detailSale"></span></p>
 							<p><strong>Venue:</strong> <span id="detailVenue"></span></p>

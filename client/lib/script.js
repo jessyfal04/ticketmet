@@ -67,6 +67,15 @@ function showView(viewID) {
 
 	$("#viewButtons").children().addClass("is-outlined");
 	$("#button-" + viewID).removeClass("is-outlined");
+
+	$("#button-detailView").css("display", viewID == "detailView" ? "" : "none");
+
+	if (viewID == "accountView") {
+		renderAccount();
+		if (user) {
+			loadPasskeys();
+		}
+	}
 }
 
 // Account
@@ -127,6 +136,7 @@ function logout() {
 		.always(function () {
 			user = null;
 			toggleConnected(false);
+			showView("accountView");
 			setMessages("success", "Signed out.");
 		});
 }
@@ -139,6 +149,7 @@ function unregisterAccount() {
 		.done(function () {
 			user = null;
 			toggleConnected(false);
+			showView("accountView");
 			setMessages("success", "Account deleted.");
 		})
 		.fail(function (xhr) {
@@ -306,6 +317,12 @@ function openConcert(id) {
 		.fail(function (xhr) {
 			setMessages("danger", errorText(xhr, "Concert not found."));
 		});
+}
+
+function closeConcert() {
+	selectedConcert = null;
+	renderConcert();
+	showView("searchView");
 }
 
 function renderConcert() {
