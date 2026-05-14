@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,97 +11,140 @@
 	<title>TicketMet</title>
 </head>
 <body>
-	<section class="hero is-info">
-		<div class="hero-body">
-			<p class="title">TicketMet</p>
-			<p class="subtitle">Concerts, alerts et SNS</p>
+	<section class="hero is-info is-small">
+		<div class="hero-body py-4">
+			<div class="level mb-0">
+				<div class="level-left">
+					<div>
+						<p class="title is-4">TicketMet</p>
+						<p class="subtitle is-6">Concerts and account security</p>
+					</div>
+				</div>
+				<div class="level-right">
+					<span id="healthStatus" class="tag is-warning">API status</span>
+				</div>
+			</div>
 		</div>
 	</section>
 
 	<div id="messages" class="mx-5 mt-4"></div>
 
 	<div class="box mx-5 mt-5">
-		<h2 class="title is-2">Compte</h2>
+		<h2 class="title is-3">Account</h2>
 
-		<p class="is-size-5 if-login" style="display:none;">Connecté : <strong id="connectedEmail"></strong></p>
-		<p class="is-size-5 if-not-login">Veuillez vous connecter.</p>
-
-		<div class="block if-login" style="display:none;">
-			<button class="button is-danger" type="button" onclick="logout()">Se déconnecter</button>
-		</div>
+		<p class="is-size-5 if-login" style="display:none;">Signed in as <strong id="connectedEmail"></strong></p>
+		<p class="is-size-5 if-not-login">Sign in or create an account.</p>
 
 		<div class="if-not-login">
 			<div class="columns">
 				<div class="column">
 					<label class="label" for="email">Email</label>
 					<input class="input" type="email" id="email" placeholder="alice@example.com" onchange="emailExists()">
-					<p class="help" id="emailHelp">Minimum : un email valide.</p>
+					<p class="help" id="emailHelp">Use a valid email address.</p>
 				</div>
 				<div class="column">
-					<label class="label" for="password">Mot de passe</label>
+					<label class="label" for="password">Password</label>
 					<input class="input" type="password" id="password" minlength="8" placeholder="********">
-					<p class="help">Minimum 8 caractères.</p>
+					<p class="help">Minimum 8 characters.</p>
 				</div>
 			</div>
 
 			<div class="buttons">
-				<button class="button is-link" type="button" id="loginButton" onclick="login()">Login</button>
+				<button class="button is-link" type="button" id="loginButton" onclick="login()">Sign in</button>
 				<button class="button is-link is-outlined" type="button" id="registerButton" onclick="register()">Register</button>
-				<button class="button is-info is-light" type="button" onclick="loginPasskey()">Login passkey</button>
+				<button class="button is-info is-light" type="button" onclick="loginPasskey()">Sign in with passkey</button>
+			</div>
+		</div>
+
+		<div class="if-login" style="display:none;">
+			<div class="columns mt-4">
+				<div class="column">
+					<h3 class="title is-5">Profile</h3>
+					<p><strong>ID:</strong> <span id="accountID"></span></p>
+					<p><strong>Email:</strong> <span id="accountEmail"></span></p>
+				</div>
+				<div class="column">
+					<h3 class="title is-5">Passkeys</h3>
+					<div class="buttons">
+						<button class="button is-info is-light" type="button" onclick="loadPasskeys()">Refresh</button>
+						<button class="button is-success" type="button" onclick="registerPasskey()">Add passkey</button>
+					</div>
+					<div id="passkeysList" class="tags are-medium"></div>
+				</div>
+			</div>
+
+			<hr>
+
+			<div class="columns">
+				<div class="column">
+					<h3 class="title is-5">Session</h3>
+					<button class="button is-warning is-light" type="button" onclick="logout()">Sign out</button>
+				</div>
+				<div class="column">
+					<h3 class="title is-5">Danger zone</h3>
+					<div class="field has-addons">
+						<div class="control is-expanded">
+							<input class="input" type="password" id="unregisterPassword" placeholder="Current password">
+						</div>
+						<div class="control">
+							<button class="button is-danger" type="button" onclick="unregisterAccount()">Delete account</button>
+						</div>
+					</div>
+					<p class="help">Required by the backend before unregistering.</p>
+				</div>
 			</div>
 		</div>
 	</div>
 
 	<div class="box mx-5">
-		<h2 class="title is-2">TicketMet</h2>
+		<h2 class="title is-3">Concerts</h2>
 
 		<div class="buttons" id="viewButtons">
-			<button class="button is-link" id="button-searchView" type="button" onclick="showView('searchView')">Recherche</button>
-			<button class="button is-link is-outlined" id="button-detailView" type="button" onclick="showView('detailView')">Fiche concert</button>
-			<button class="button is-link is-outlined" id="button-profileView" type="button" onclick="showView('profileView')">Profil</button>
+			<button class="button is-link" id="button-searchView" type="button" onclick="showView('searchView')">Search</button>
+			<button class="button is-link is-outlined" id="button-detailView" type="button" onclick="showView('detailView')">Concert details</button>
 		</div>
 
 		<div id="views">
 			<div id="searchView">
 				<div class="columns">
 					<div class="column">
-						<label class="label" for="artistSearch">Artiste</label>
+						<label class="label" for="artistSearch">Artist</label>
 						<div class="field has-addons">
 							<div class="control is-expanded">
 								<input class="input" type="text" id="artistSearch" placeholder="NMIXX">
 							</div>
 							<div class="control">
-								<button class="button is-info" type="button" onclick="searchArtists()">Chercher</button>
+								<button class="button is-info" type="button" onclick="searchArtists()">Search</button>
 							</div>
 						</div>
 						<div class="select is-fullwidth">
 							<select id="artistResults" onchange="selectArtist()">
-								<option value="">Tous les artistes</option>
+								<option value="">All artists</option>
 							</select>
 						</div>
 					</div>
 
 					<div class="column">
-						<label class="label" for="venueSearch">Salle</label>
+						<label class="label" for="venueSearch">Venue</label>
 						<div class="field has-addons">
 							<div class="control is-expanded">
 								<input class="input" type="text" id="venueSearch" placeholder="Accor">
 							</div>
 							<div class="control">
-								<button class="button is-info" type="button" onclick="searchVenues()">Chercher</button>
+								<button class="button is-info" type="button" onclick="searchVenues()">Search</button>
 							</div>
 						</div>
 						<div class="select is-fullwidth">
 							<select id="venueResults" onchange="selectVenue()">
-								<option value="">Toutes les salles</option>
+								<option value="">All venues</option>
 							</select>
 						</div>
 					</div>
 				</div>
 
 				<div class="buttons">
-					<button class="button is-success" type="button" onclick="loadConcerts()">Filtrer</button>
-					<button class="button is-warning is-light" type="button" onclick="clearSearch()">Reset</button>
+					<button class="button is-success" type="button" onclick="loadConcerts()">Apply filters</button>
+					<button class="button is-warning is-light" type="button" onclick="clearSearch()">Clear</button>
 				</div>
 
 				<div class="table-container">
@@ -110,8 +153,8 @@
 							<tr>
 								<th>Concert</th>
 								<th>Date</th>
-								<th>Salle</th>
-								<th>Artiste</th>
+								<th>Venue</th>
+								<th>Artist</th>
 								<th>Action</th>
 							</tr>
 						</thead>
@@ -121,18 +164,18 @@
 			</div>
 
 			<div id="detailView" style="display:none;">
-				<p id="noConcertText" class="is-size-5">Sélectionnez un concert depuis la recherche.</p>
+				<p id="noConcertText" class="is-size-5">Select a concert from the search results.</p>
 
 				<div id="concertDetails" style="display:none;">
 					<div class="columns">
 						<div class="column is-two-thirds">
 							<h3 class="title is-3" id="detailName"></h3>
-							<p><strong>Date :</strong> <span id="detailDate"></span></p>
-							<p><strong>Vente :</strong> <span id="detailSale"></span></p>
-							<p><strong>Salle :</strong> <span id="detailVenue"></span></p>
-							<p><strong>Artiste :</strong> <span id="detailArtist"></span></p>
-							<p><a id="detailURL" href="#" target="_blank" rel="noreferrer">Page Ticketmaster</a></p>
-							<p><a id="detailSeatmap" href="#" target="_blank" rel="noreferrer">Plan de salle</a></p>
+							<p><strong>Date:</strong> <span id="detailDate"></span></p>
+							<p><strong>Sale:</strong> <span id="detailSale"></span></p>
+							<p><strong>Venue:</strong> <span id="detailVenue"></span></p>
+							<p><strong>Artist:</strong> <span id="detailArtist"></span></p>
+							<p><a id="detailURL" href="#" target="_blank" rel="noreferrer">Ticketmaster page</a></p>
+							<p><a id="detailSeatmap" href="#" target="_blank" rel="noreferrer">Seat map</a></p>
 						</div>
 						<div class="column">
 							<figure class="image is-16by9">
@@ -140,55 +183,14 @@
 							</figure>
 						</div>
 					</div>
-
-					<div class="buttons">
-						<button class="button is-success" type="button" onclick="todoFeature('favorites')">Ajouter aux favorites</button>
-						<button class="button is-link" type="button" onclick="todoFeature('WTB')">WTB</button>
-						<button class="button is-info" type="button" onclick="todoFeature('WTS')">WTS</button>
-					</div>
-
-					<div class="columns">
-						<div class="column">
-							<h4 class="title is-5">Setlist potentielle</h4>
-							<p class="has-text-grey">TODO backend : endpoint prévu dans le README.</p>
-						</div>
-						<div class="column">
-							<h4 class="title is-5">WTB / WTS</h4>
-							<p class="has-text-grey">TODO backend : endpoint prévu dans le README.</p>
-						</div>
-						<div class="column">
-							<h4 class="title is-5">SNS</h4>
-							<p class="has-text-grey">TODO backend : endpoint prévu dans le README.</p>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<div id="profileView" style="display:none;">
-				<p class="is-size-5 if-not-login">Vous devez être connecté pour gérer votre profil.</p>
-
-				<div class="if-login" style="display:none;">
-					<h3 class="title is-4">Utilisateur</h3>
-					<p><strong>ID :</strong> <span id="profileID"></span></p>
-					<p><strong>Email :</strong> <span id="profileEmail"></span></p>
-
-					<h3 class="title is-4 mt-5">Passkeys</h3>
-					<div class="buttons">
-						<button class="button is-info" type="button" onclick="loadPasskeys()">Rafraîchir</button>
-						<button class="button is-success" type="button" onclick="registerPasskey()">Ajouter une passkey</button>
-					</div>
-					<div id="passkeysList" class="tags"></div>
-
-					<h3 class="title is-4 mt-5">SNS, favorites, WTB/WTS, alerts</h3>
-					<p class="has-text-grey">TODO backend : routes prévues dans le README, pas encore implémentées.</p>
 				</div>
 			</div>
 		</div>
 	</div>
 
-	<footer class="footer">
+	<footer class="footer py-5">
 		<div class="content has-text-centered">
-			<p><strong>TicketMet</strong> - projet universitaire PC3R.</p>
+			<p><strong>TicketMet</strong> - PC3R university project.</p>
 		</div>
 	</footer>
 </body>

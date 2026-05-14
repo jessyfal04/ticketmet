@@ -120,7 +120,7 @@ func handleLogout(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		}
 	}
 
-	http.SetCookie(w, sessionCookie("", -1))
+	http.SetCookie(w, sessionCookie(r, "", -1))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -158,7 +158,7 @@ func handleUnregister(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
-	http.SetCookie(w, sessionCookie("", -1))
+	http.SetCookie(w, sessionCookie(r, "", -1))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -206,8 +206,8 @@ func requireUser(w http.ResponseWriter, r *http.Request, db *sql.DB) (model.User
 			FROM sessions s
 			JOIN users u ON u.id = s.user_id
 			WHERE s.token_hash = ?
-				AND s.expires_at > strftime('%s','now')`, 
-				model.ScanUser, hashToken(cookie.Value))
+				AND s.expires_at > strftime('%s','now')`,
+		model.ScanUser, hashToken(cookie.Value))
 
 	if err != nil {
 		logHttpError(w, http.StatusUnauthorized, "authentication required", nil)
@@ -238,23 +238,26 @@ func createSessionCookie(w http.ResponseWriter, r *http.Request, db *sql.DB, use
 		return false
 	}
 
-	http.SetCookie(w, sessionCookie(token, int(time.Until(expires).Seconds())))
+	http.SetCookie(w, sessionCookie(r, token, int(time.Until(expires).Seconds())))
 	return true
 }
 
 // Build the session cookie with appropriate flags
-func sessionCookie(value string, maxAge int) *http.Cookie {
+func sessionCookie(r *http.Request, value string, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     "session",
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
 	}
 }
 
+func isSecureRequest(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
 
 // hashToken hashes a token before database storage
 func hashToken(token string) string {

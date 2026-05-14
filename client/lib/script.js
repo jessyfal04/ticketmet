@@ -8,6 +8,7 @@ let selectedConcert = null;
 
 $(function () {
 	showView("searchView");
+	checkHealth();
 	checkSession();
 	loadConcerts();
 });
@@ -66,14 +67,19 @@ function showView(viewID) {
 
 	$("#viewButtons").children().addClass("is-outlined");
 	$("#button-" + viewID).removeClass("is-outlined");
-
-	if (viewID == "profileView") {
-		renderProfile();
-		loadPasskeys();
-	}
 }
 
-// Compte
+// Account
+function checkHealth() {
+	$.ajax({ method: "GET", url: "/healthz" })
+		.done(function () {
+			$("#healthStatus").removeClass("is-warning is-danger").addClass("is-success").text("API online");
+		})
+		.fail(function () {
+			$("#healthStatus").removeClass("is-warning is-success").addClass("is-danger").text("API offline");
+		});
+}
+
 function checkSession() {
 	api("GET", "/api/auth/me")
 		.done(function (response) {
@@ -94,10 +100,10 @@ function login() {
 		.done(function (response) {
 			user = response.user;
 			toggleConnected(true);
-			setMessages("success", "Session ouverte.");
+			setMessages("success", "Signed in.");
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Connexion impossible."));
+			setMessages("danger", errorText(xhr, "Sign in failed."));
 		});
 }
 
@@ -109,10 +115,10 @@ function register() {
 		.done(function (response) {
 			user = response.user;
 			toggleConnected(true);
-			setMessages("success", "Compte créé.");
+			setMessages("success", "Account created.");
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Inscription impossible."));
+			setMessages("danger", errorText(xhr, "Registration failed."));
 		});
 }
 
@@ -121,7 +127,22 @@ function logout() {
 		.always(function () {
 			user = null;
 			toggleConnected(false);
-			setMessages("success", "Session fermée.");
+			setMessages("success", "Signed out.");
+		});
+}
+
+function unregisterAccount() {
+	if (!user) return;
+	if (!window.confirm("Delete this account and all its data?")) return;
+
+	api("DELETE", "/api/auth/unregister", { password: $("#unregisterPassword").val() })
+		.done(function () {
+			user = null;
+			toggleConnected(false);
+			setMessages("success", "Account deleted.");
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Account deletion failed."));
 		});
 }
 
@@ -132,11 +153,11 @@ function emailExists() {
 	api("GET", "/api/auth/email-exists", { email: email })
 		.done(function (response) {
 			if (response.exists) {
-				$("#emailHelp").text("Email déjà enregistré.");
+				$("#emailHelp").text("Email already registered.");
 				$("#registerButton").prop("disabled", true);
 				$("#loginButton").prop("disabled", false);
 			} else {
-				$("#emailHelp").text("Email disponible.");
+				$("#emailHelp").text("Email available.");
 				$("#registerButton").prop("disabled", false);
 				$("#loginButton").prop("disabled", true);
 			}
@@ -147,10 +168,27 @@ function toggleConnected(connected) {
 	$(".if-login").css("display", connected ? "" : "none");
 	$(".if-not-login").css("display", connected ? "none" : "");
 	$("#connectedEmail").text(user ? user.Email : "");
-	renderProfile();
+	renderAccount();
+	if (connected) {
+		loadPasskeys();
+	}
 }
 
-// Recherche
+function renderAccount() {
+	if (!user) {
+		$("#accountID").text("");
+		$("#accountEmail").text("");
+		$("#passkeysList").html("");
+		$("#unregisterPassword").val("");
+		return;
+	}
+
+	$("#accountID").text(user.ID);
+	$("#accountEmail").text(user.Email);
+	$("#unregisterPassword").val("");
+}
+
+// Search
 function searchArtists() {
 	api("GET", "/api/artists", { search: $("#artistSearch").val() })
 		.done(function (response) {
@@ -158,7 +196,7 @@ function searchArtists() {
 			renderArtists();
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Recherche artiste impossible."));
+			setMessages("danger", errorText(xhr, "Artist search failed."));
 		});
 }
 
@@ -169,12 +207,12 @@ function searchVenues() {
 			renderVenues();
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Recherche salle impossible."));
+			setMessages("danger", errorText(xhr, "Venue search failed."));
 		});
 }
 
 function renderArtists() {
-	$("#artistResults").html(`<option value="">Tous les artistes</option>`);
+	$("#artistResults").html(`<option value="">All artists</option>`);
 	for (let i = 0; i < artists.length; i = i + 1) {
 		let artist = artists[i];
 		$("#artistResults").append(`
@@ -187,7 +225,7 @@ function renderArtists() {
 }
 
 function renderVenues() {
-	$("#venueResults").html(`<option value="">Toutes les salles</option>`);
+	$("#venueResults").html(`<option value="">All venues</option>`);
 	for (let i = 0; i < venues.length; i = i + 1) {
 		let venue = venues[i];
 		$("#venueResults").append(`
@@ -232,13 +270,13 @@ function loadConcerts() {
 			renderConcerts();
 		})
 		.fail(function (xhr) {
-			$("#concertsList").html(`<tr><td colspan="5">${escapeHTML(errorText(xhr, "Impossible de charger les concerts."))}</td></tr>`);
+			$("#concertsList").html(`<tr><td colspan="5">${escapeHTML(errorText(xhr, "Unable to load concerts."))}</td></tr>`);
 		});
 }
 
 function renderConcerts() {
 	if (concerts.length == 0) {
-		$("#concertsList").html(`<tr><td colspan="5">Aucun concert.</td></tr>`);
+		$("#concertsList").html(`<tr><td colspan="5">No concerts.</td></tr>`);
 		return;
 	}
 
@@ -248,13 +286,13 @@ function renderConcerts() {
 		let id = itemID(concert);
 		$("#concertsList").append(`
 			<tr>
-				<td>${escapeHTML(concert.Name)}</td>
-				<td>${escapeHTML(formatDate(concert.Date))}</td>
-				<td>${escapeHTML(nameFromList(venues, concert.VenueID, "salle"))}</td>
-				<td>${escapeHTML(nameFromList(artists, concert.ArtistID, "artiste"))}</td>
-				<td><button class="button is-info is-small" type="button" onclick="openConcert('${escapeHTML(id)}')">Ouvrir</button></td>
-			</tr>
-		`);
+					<td>${escapeHTML(concert.Name)}</td>
+					<td>${escapeHTML(formatDate(concert.Date))}</td>
+					<td>${escapeHTML(concert.VenueName || "Unknown venue")}</td>
+					<td>${escapeHTML(concert.ArtistName || "Unknown artist")}</td>
+					<td><button class="button is-info is-small" type="button" onclick="openConcert('${escapeHTML(id)}')">Open</button></td>
+				</tr>
+			`);
 	}
 }
 
@@ -266,7 +304,7 @@ function openConcert(id) {
 			showView("detailView");
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Concert introuvable."));
+			setMessages("danger", errorText(xhr, "Concert not found."));
 		});
 }
 
@@ -281,9 +319,9 @@ function renderConcert() {
 	$("#concertDetails").show();
 	$("#detailName").text(selectedConcert.Name);
 	$("#detailDate").text(formatDate(selectedConcert.Date));
-	$("#detailSale").text(formatDate(selectedConcert.SaleStartDateTime) || "Non renseignée");
-	$("#detailVenue").text(nameFromList(venues, selectedConcert.VenueID, "salle"));
-	$("#detailArtist").text(nameFromList(artists, selectedConcert.ArtistID, "artiste"));
+	$("#detailSale").text(formatDate(selectedConcert.SaleStartDateTime) || "Not provided");
+	$("#detailVenue").text(selectedConcert.VenueName || "Unknown venue");
+	$("#detailArtist").text(selectedConcert.ArtistName || "Unknown artist");
 	$("#detailURL").attr("href", selectedConcert.URL || "#");
 	$("#detailSeatmap").attr("href", selectedConcert.SeatmapURL || "#");
 
@@ -294,19 +332,7 @@ function renderConcert() {
 	$("#detailPhoto").attr("src", photo);
 }
 
-// Profil et passkeys
-function renderProfile() {
-	if (!user) {
-		$("#profileID").text("");
-		$("#profileEmail").text("");
-		$("#passkeysList").html("");
-		return;
-	}
-
-	$("#profileID").text(user.ID);
-	$("#profileEmail").text(user.Email);
-}
-
+// Passkeys
 function loadPasskeys() {
 	if (!user) return;
 
@@ -316,23 +342,25 @@ function loadPasskeys() {
 			$("#passkeysList").html("");
 
 			if (passkeys.length == 0) {
-				$("#passkeysList").append(`<span class="tag is-light">Aucune passkey</span>`);
+				$("#passkeysList").append(`<span class="tag is-light">No passkeys</span>`);
 				return;
 			}
 
 			for (let i = 0; i < passkeys.length; i = i + 1) {
 				let passkey = passkeys[i];
 				let id = passkey.CredentialID;
+				let signCount = field(passkey, ["SignCount", "signCount"], 0);
 				$("#passkeysList").append(`
-					<span class="tag is-info is-light">
-						${escapeHTML(id.substring(0, 18))}...
-						<button class="delete is-small" onclick="deletePasskey('${escapeHTML(id)}')"></button>
-					</span>
+					<div class="tag is-info is-light is-medium">
+						<span title="${escapeHTML(id)}">${escapeHTML(id.substring(0, 18))}...</span>
+						<span class="ml-2 has-text-grey">#${escapeHTML(signCount)}</span>
+						<button class="delete is-small ml-2" type="button" onclick="deletePasskey('${escapeHTML(id)}')"></button>
+					</div>
 				`);
 			}
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Impossible de lister les passkeys."));
+			setMessages("danger", errorText(xhr, "Unable to list passkeys."));
 		});
 }
 
@@ -340,69 +368,90 @@ function deletePasskey(id) {
 	api("DELETE", "/api/auth/passkeys/" + encodeURIComponent(id))
 		.done(function () {
 			loadPasskeys();
-			setMessages("success", "Passkey supprimée.");
+			setMessages("success", "Passkey deleted.");
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Suppression passkey impossible."));
+			setMessages("danger", errorText(xhr, "Passkey deletion failed."));
 		});
 }
 
 function registerPasskey() {
 	if (!window.PublicKeyCredential) {
-		setMessages("danger", "Navigateur incompatible avec les passkeys.");
+		setMessages("danger", "This browser does not support passkeys.");
 		return;
 	}
 
 	api("POST", "/api/auth/passkeys/register/begin")
 		.done(function (options) {
-			options.publicKey.challenge = base64ToBuffer(options.publicKey.challenge);
-			options.publicKey.user.id = base64ToBuffer(options.publicKey.user.id);
+			let publicKey = options.publicKey;
+			publicKey.challenge = base64ToBuffer(publicKey.challenge);
+			publicKey.user.id = base64ToBuffer(publicKey.user.id);
+			if (publicKey.excludeCredentials) {
+				for (let i = 0; i < publicKey.excludeCredentials.length; i = i + 1) {
+					publicKey.excludeCredentials[i].id = base64ToBuffer(publicKey.excludeCredentials[i].id);
+				}
+			}
+
 			navigator.credentials.create(options)
 				.then(function (credential) {
-					return api("POST", "/api/auth/passkeys/register/finish", credentialToJSON(credential));
+					return new Promise(function (resolve, reject) {
+						api("POST", "/api/auth/passkeys/register/finish", credentialToJSON(credential))
+							.done(resolve)
+							.fail(function (xhr) {
+								reject(new Error(errorText(xhr, "server validation refused")));
+							});
+					});
 				})
 				.then(function () {
 					loadPasskeys();
-					setMessages("success", "Passkey ajoutée.");
+					setMessages("success", "Passkey added.");
 				})
-				.catch(function () {
-					setMessages("danger", "Création passkey annulée ou refusée.");
+				.catch(function (error) {
+					setMessages("danger", "Passkey creation failed: " + passkeyError(error));
 				});
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Démarrage passkey impossible."));
+			setMessages("danger", errorText(xhr, "Unable to start passkey creation."));
 		});
 }
 
 function loginPasskey() {
 	if (!window.PublicKeyCredential) {
-		setMessages("danger", "Navigateur incompatible avec les passkeys.");
+		setMessages("danger", "This browser does not support passkeys.");
 		return;
 	}
 
 	api("POST", "/api/auth/passkeys/login/begin")
 		.done(function (options) {
-			options.publicKey.challenge = base64ToBuffer(options.publicKey.challenge);
-			if (options.publicKey.allowCredentials) {
-				for (let i = 0; i < options.publicKey.allowCredentials.length; i = i + 1) {
-					options.publicKey.allowCredentials[i].id = base64ToBuffer(options.publicKey.allowCredentials[i].id);
+			let publicKey = options.publicKey;
+			publicKey.challenge = base64ToBuffer(publicKey.challenge);
+			if (publicKey.allowCredentials) {
+				for (let i = 0; i < publicKey.allowCredentials.length; i = i + 1) {
+					publicKey.allowCredentials[i].id = base64ToBuffer(publicKey.allowCredentials[i].id);
 				}
 			}
+
 			navigator.credentials.get(options)
 				.then(function (credential) {
-					return api("POST", "/api/auth/passkeys/login/finish", credentialToJSON(credential));
+					return new Promise(function (resolve, reject) {
+						api("POST", "/api/auth/passkeys/login/finish", credentialToJSON(credential))
+							.done(resolve)
+							.fail(function (xhr) {
+								reject(new Error(errorText(xhr, "server validation refused")));
+							});
+					});
 				})
 				.then(function (response) {
 					user = response.user;
 					toggleConnected(true);
-					setMessages("success", "Session passkey ouverte.");
+					setMessages("success", "Signed in with passkey.");
 				})
-				.catch(function () {
-					setMessages("danger", "Connexion passkey annulée ou refusée.");
+				.catch(function (error) {
+					setMessages("danger", "Passkey sign in failed: " + passkeyError(error));
 				});
 		})
 		.fail(function (xhr) {
-			setMessages("danger", errorText(xhr, "Démarrage passkey impossible."));
+			setMessages("danger", errorText(xhr, "Unable to start passkey sign in."));
 		});
 }
 
@@ -426,6 +475,9 @@ function credentialToJSON(credential) {
 
 function base64ToBuffer(value) {
 	let base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+	while (base64.length % 4 != 0) {
+		base64 = base64 + "=";
+	}
 	let raw = window.atob(base64);
 	let buffer = new ArrayBuffer(raw.length);
 	let bytes = new Uint8Array(buffer);
@@ -444,7 +496,7 @@ function bufferToBase64(buffer) {
 	return window.btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-// Petits utilitaires
+// Small utilities
 function nameFromList(list, id, label) {
 	for (let i = 0; i < list.length; i = i + 1) {
 		if (String(itemID(list[i])) == String(id)) {
@@ -458,7 +510,7 @@ function formatDate(value) {
 	if (!value || value == "0001-01-01T00:00:00Z") return "";
 	let date = new Date(value);
 	if (Number.isNaN(date.getTime())) return String(value);
-	return date.toLocaleString("fr-FR", {
+	return date.toLocaleString("en-US", {
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",
@@ -474,6 +526,9 @@ function errorText(xhr, fallback) {
 	return fallback;
 }
 
-function todoFeature(name) {
-	setMessages("warning", name + " : route prévue dans le README, pas encore implémentée côté backend.");
+function passkeyError(error) {
+	if (error && error.message) {
+		return error.message;
+	}
+	return "cancelled or refused by the browser";
 }

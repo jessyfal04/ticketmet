@@ -6,8 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"os"
 	"server/model"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -54,7 +56,7 @@ func handlePasskeyRegisterBegin(w http.ResponseWriter, r *http.Request, db *sql.
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
 	}
-	wa, err := newWebAuthn()
+	wa, err := newWebAuthn(r)
 	if err != nil {
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
@@ -97,7 +99,7 @@ func handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Request, db *sql
 		logHttpError(w, http.StatusBadRequest, "passkey registration challenge not found", err)
 		return
 	}
-	wa, err := newWebAuthn()
+	wa, err := newWebAuthn(r)
 	if err != nil {
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
@@ -112,14 +114,17 @@ func handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Request, db *sql
 
 	// Insert the new credential into database
 	err = sqlExec(r, db, `
-		INSERT INTO webauthn_credentials (
-			user_id, credential_id, public_key, sign_count
+		INSERT INTO webauthn_credentials (user_id, credential_id, public_key, sign_count, user_present,	user_verified, backup_eligible, backup_state
 		)
-		VALUES (?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID,
 		base64.RawURLEncoding.EncodeToString(credential.ID),
 		base64.RawURLEncoding.EncodeToString(credential.PublicKey),
-		credential.Authenticator.SignCount)
+		credential.Authenticator.SignCount,
+		credential.Flags.UserPresent,
+		credential.Flags.UserVerified,
+		credential.Flags.BackupEligible,
+		credential.Flags.BackupState)
 	if err != nil {
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
@@ -131,15 +136,17 @@ func handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Request, db *sql
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
 	}
-	http.SetCookie(w, webAuthnChallengeCookie("", -1))
+	http.SetCookie(w, webAuthnChallengeCookie(r, "", -1))
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, map[string]bool{"ok": true})
 }
 
 // Start passkey login
 func handlePasskeyLoginBegin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Build login options, no need email
-	wa, err := newWebAuthn()
+	wa, err := newWebAuthn(r)
 	if err != nil {
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
@@ -169,7 +176,7 @@ func handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request, db *sql.DB
 	}
 
 	// Build WebAuthn config
-	wa, err := newWebAuthn()
+	wa, err := newWebAuthn(r)
 	if err != nil {
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
@@ -181,6 +188,9 @@ func handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request, db *sql.DB
 	// Verify credential
 	resolvedUser, credential, err := wa.FinishPasskeyLogin(
 		func(rawID, userHandle []byte) (webauthn.User, error) {
+			if len(rawID) > 0 {
+				return loadWebAuthnUserByCredentialID(r, db, rawID)
+			}
 			id, err := strconv.Atoi(string(userHandle))
 			if err != nil {
 				return nil, err
@@ -199,12 +209,18 @@ func handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request, db *sql.DB
 	}
 	user = resolved
 
-	// Update counter and remove the one-time WebAuthn wa_sessionData.
+	// Update mutable credential state and remove the one-time WebAuthn wa_sessionData.
 	err = sqlExec(r, db, `
 		UPDATE webauthn_credentials
-		SET sign_count = ?
+		SET sign_count = ?,
+			user_present = ?,
+			user_verified = ?,
+			backup_state = ?
 		WHERE credential_id = ?`,
 		credential.Authenticator.SignCount,
+		credential.Flags.UserPresent,
+		credential.Flags.UserVerified,
+		credential.Flags.BackupState,
 		base64.RawURLEncoding.EncodeToString(credential.ID))
 	if err != nil {
 		logHttpError(w, http.StatusInternalServerError, "", err)
@@ -217,7 +233,7 @@ func handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request, db *sql.DB
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
 	}
-	http.SetCookie(w, webAuthnChallengeCookie("", -1))
+	http.SetCookie(w, webAuthnChallengeCookie(r, "", -1))
 	if !createSessionCookie(w, r, db, user.ID) {
 		return
 	}
@@ -234,7 +250,13 @@ func handlePasskeyList(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 	// Query credentials
 	items, err := sqlScanList(r, db, `
-		SELECT credential_id, public_key, sign_count
+		SELECT credential_id,
+			public_key,
+			sign_count,
+			user_present,
+			user_verified,
+			backup_eligible,
+			backup_state
 		FROM webauthn_credentials
 		WHERE user_id = ?
 		ORDER BY id`, model.ScanPublicPasskey, user.ID)
@@ -271,12 +293,35 @@ func handlePasskeyDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 // Helper
 
-// newWebAuthn builds WebAuthn config for the current host.
-func newWebAuthn() (*webauthn.WebAuthn, error) {
+// newWebAuthn builds WebAuthn config for prod and local dev.
+func newWebAuthn(r *http.Request) (*webauthn.WebAuthn, error) {
+	host := r.Host
+	if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
+		host = forwardedHost
+	}
+	rpID := strings.Split(host, ":")[0]
+	if value := os.Getenv("WEBAUTHN_RP_ID"); value != "" {
+		rpID = value
+	}
+
+	proto := "http"
+	if r.TLS != nil {
+		proto = "https"
+	}
+	if forwardedProto := r.Header.Get("X-Forwarded-Proto"); forwardedProto != "" {
+		proto = forwardedProto
+	}
+	origin := proto + "://" + host
+
+	origins := []string{origin}
+	if value := os.Getenv("WEBAUTHN_ORIGINS"); value != "" {
+		origins = strings.Split(value, ",")
+	}
+
 	return webauthn.New(&webauthn.Config{
-		RPID:          "ticketmet.jessyfal04.dev",
+		RPID:          rpID,
 		RPDisplayName: "TicketMet",
-		RPOrigins:     []string{"https://ticketmet.jessyfal04.dev"},
+		RPOrigins:     origins,
 	})
 }
 
@@ -291,7 +336,13 @@ func loadWebAuthnUser(r *http.Request, db *sql.DB, id int) (webAuthnUser, error)
 	}
 
 	passkeys, err := sqlScanList(r, db, `
-		SELECT credential_id, public_key, sign_count
+		SELECT credential_id,
+			public_key,
+			sign_count,
+			user_present,
+			user_verified,
+			backup_eligible,
+			backup_state
 		FROM webauthn_credentials
 		WHERE user_id = ?
 		ORDER BY id`, model.ScanPasskey, id)
@@ -310,8 +361,14 @@ func loadWebAuthnUser(r *http.Request, db *sql.DB, id int) (webAuthnUser, error)
 			return webAuthnUser{}, err
 		}
 		credentials = append(credentials, webauthn.Credential{
-			ID:            id,
-			PublicKey:     publicKey,
+			ID:        id,
+			PublicKey: publicKey,
+			Flags: webauthn.CredentialFlags{
+				UserPresent:    passkey.UserPresent,
+				UserVerified:   passkey.UserVerified,
+				BackupEligible: passkey.BackupEligible,
+				BackupState:    passkey.BackupState,
+			},
 			Authenticator: webauthn.Authenticator{SignCount: uint32(passkey.SignCount)},
 		})
 	}
@@ -319,6 +376,22 @@ func loadWebAuthnUser(r *http.Request, db *sql.DB, id int) (webAuthnUser, error)
 		User:        user,
 		credentials: credentials,
 	}, nil
+}
+
+// Load the owner of a credential ID, then load all their credentials.
+func loadWebAuthnUserByCredentialID(r *http.Request, db *sql.DB, credentialID []byte) (webAuthnUser, error) {
+	encodedID := base64.RawURLEncoding.EncodeToString(credentialID)
+
+	user, err := sqlScanOne(r, db, `
+		SELECT u.id, u.email, u.password_hash
+		FROM users u
+		JOIN webauthn_credentials wc ON wc.user_id = u.id
+		WHERE wc.credential_id = ?`, model.ScanUser, encodedID)
+	if err != nil {
+		return webAuthnUser{}, err
+	}
+
+	return loadWebAuthnUser(r, db, user.ID)
 }
 
 // Stores the WebAuthn SessionData
@@ -342,7 +415,7 @@ func saveWebAuthnChallenge(w http.ResponseWriter, r *http.Request, db *sql.DB, u
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return false
 	}
-	http.SetCookie(w, webAuthnChallengeCookie(token, int(time.Until(expires).Seconds())))
+	http.SetCookie(w, webAuthnChallengeCookie(r, token, int(time.Until(expires).Seconds())))
 	return true
 }
 
@@ -376,13 +449,13 @@ func loadWebAuthnChallenge(r *http.Request, db *sql.DB, userID *int, kind string
 }
 
 // webAuthnChallengeCookie builds the short-lived challenge cookie.
-func webAuthnChallengeCookie(value string, maxAge int) *http.Cookie {
+func webAuthnChallengeCookie(r *http.Request, value string, maxAge int) *http.Cookie {
 	return &http.Cookie{
 		Name:     "webauthn_challenge",
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   maxAge,
 	}

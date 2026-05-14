@@ -15,10 +15,22 @@ func handleConcerts(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 	// Query concerts with optional filters
 	sqlQueryList(w, r, db, "concerts", `
-		SELECT *
-		FROM concerts
-		WHERE (? IS NULL OR artist_id = ?) AND (? IS NULL OR venue_id = ?)
-		ORDER BY date`, model.ScanConcert, artistFilter, artistFilter, venueFilter, venueFilter)
+		SELECT c.id,
+			c.name,
+			c.date,
+			c.venue_id,
+			c.artist_id,
+			c.url,
+			c.photo_url,
+			c.seatmap_url,
+			c.sale_start_datetime,
+			v.name,
+			a.name
+		FROM concerts c
+		JOIN venues v ON v.id = c.venue_id
+		JOIN artists a ON a.id = c.artist_id
+		WHERE (? IS NULL OR c.artist_id = ?) AND (? IS NULL OR c.venue_id = ?)
+		ORDER BY c.date`, model.ScanDisplayConcert, artistFilter, artistFilter, venueFilter, venueFilter)
 }
 
 // Get a concert by ID
@@ -38,7 +50,19 @@ func handleConcertByID(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 	// Query the concert by ID
 	sqlQueryOne(w, r, db, "concert", `
-		SELECT *
-		FROM concerts
-		WHERE id = ?`, model.ScanConcert, id)
+		SELECT c.id,
+			c.name,
+			c.date,
+			c.venue_id,
+			c.artist_id,
+			c.url,
+			c.photo_url,
+			c.seatmap_url,
+			c.sale_start_datetime,
+			v.name,
+			a.name
+		FROM concerts c
+		JOIN venues v ON v.id = c.venue_id
+		JOIN artists a ON a.id = c.artist_id
+		WHERE c.id = ?`, model.ScanDisplayConcert, id)
 }

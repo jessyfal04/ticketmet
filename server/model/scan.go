@@ -31,6 +31,35 @@ func ScanConcert(row interface{ Scan(...any) error }) (Concert, error) {
 	return concert, nil
 }
 
+func ScanDisplayConcert(row interface{ Scan(...any) error }) (DisplayConcert, error) {
+	var concert DisplayConcert
+	var date string
+	var photoURL string
+	var saleStart string
+	err := row.Scan(
+		&concert.ID,
+		&concert.Name,
+		&date,
+		&concert.VenueID,
+		&concert.ArtistID,
+		&concert.URL,
+		&photoURL,
+		&concert.SeatmapURL,
+		&saleStart,
+		&concert.VenueName,
+		&concert.ArtistName,
+	)
+	if err != nil {
+		return DisplayConcert{}, err
+	}
+	concert.Date = parseTime(date)
+	if photoURL != "" {
+		concert.Photos = []string{photoURL}
+	}
+	concert.SaleStartDateTime = parseTime(saleStart)
+	return concert, nil
+}
+
 func ScanUser(row interface{ Scan(...any) error }) (User, error) {
 	var user User
 	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash)
@@ -39,7 +68,15 @@ func ScanUser(row interface{ Scan(...any) error }) (User, error) {
 
 func ScanPasskey(row interface{ Scan(...any) error }) (Passkey, error) {
 	var passkey Passkey
-	err := row.Scan(&passkey.CredentialID, &passkey.PublicKey, &passkey.SignCount)
+	err := row.Scan(
+		&passkey.CredentialID,
+		&passkey.PublicKey,
+		&passkey.SignCount,
+		&passkey.UserPresent,
+		&passkey.UserVerified,
+		&passkey.BackupEligible,
+		&passkey.BackupState,
+	)
 	return passkey, err
 }
 

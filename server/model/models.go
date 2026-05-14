@@ -14,6 +14,12 @@ type Concert struct {
 	SaleStartDateTime time.Time
 }
 
+type DisplayConcert struct {
+	Concert
+	VenueName  string
+	ArtistName string
+}
+
 type Venue struct {
 	ID      int
 	Name    string
@@ -43,9 +49,13 @@ func (u User) Public() PublicUser {
 }
 
 type Passkey struct {
-	CredentialID string
-	PublicKey    string
-	SignCount    int
+	CredentialID   string
+	PublicKey      string
+	SignCount      int
+	UserPresent    bool
+	UserVerified   bool
+	BackupEligible bool
+	BackupState    bool
 }
 
 // PublicPasskey is the safe representation returned to the front-end.
