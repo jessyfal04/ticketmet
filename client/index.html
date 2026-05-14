@@ -61,6 +61,7 @@
 								<option value="">All artists</option>
 							</select>
 						</div>
+						<button class="button is-small is-link is-light mt-2 if-login" style="display:none;" type="button" onclick="createAlertFromSelection('artist')">Alert this artist</button>
 					</div>
 
 					<div class="column">
@@ -78,6 +79,7 @@
 								<option value="">All venues</option>
 							</select>
 						</div>
+						<button class="button is-small is-link is-light mt-2 if-login" style="display:none;" type="button" onclick="createAlertFromSelection('venue')">Alert this venue</button>
 					</div>
 				</div>
 
@@ -132,7 +134,13 @@
 							<h3 class="title is-5">Profile</h3>
 							<p><strong>ID:</strong> <span id="accountID"></span></p>
 							<p><strong>Email:</strong> <span id="accountEmail"></span></p>
+
+							<label class="label mt-4" for="profileSNS">SNS</label>
+							<textarea class="textarea" id="profileSNS" rows="3" placeholder="twitter @jessyfal04"></textarea>
+							<p class="help">One handle or link per line.</p>
+
 							<div class="buttons mt-4">
+								<button class="button is-link" type="button" onclick="saveSNS()">Save SNS</button>
 								<button class="button is-warning is-light" type="button" onclick="logout()">Sign out</button>
 							</div>
 						</div>
@@ -143,6 +151,24 @@
 								<button class="button is-success" type="button" onclick="registerPasskey()">Add passkey</button>
 							</div>
 							<div id="passkeysList" class="tags are-medium"></div>
+						</div>
+					</div>
+
+					<hr>
+
+					<h3 class="title is-5">My activity</h3>
+					<div class="columns">
+						<div class="column">
+							<h4 class="title is-6">Favorites</h4>
+							<div id="profileFavorites" class="content is-small"></div>
+						</div>
+						<div class="column">
+							<h4 class="title is-6">WTB / WTS</h4>
+							<div id="profileWT" class="content is-small"></div>
+						</div>
+						<div class="column">
+							<h4 class="title is-6">Alerts</h4>
+							<div id="profileAlerts" class="content is-small"></div>
 						</div>
 					</div>
 
@@ -182,11 +208,37 @@
 							<p><strong>Artist:</strong> <span id="detailArtist"></span></p>
 							<p><a id="detailURL" href="#" target="_blank" rel="noreferrer">Ticketmaster page</a></p>
 							<p><a id="detailSeatmap" href="#" target="_blank" rel="noreferrer">Seat map</a></p>
+
+							<div class="buttons mt-4 if-login" style="display:none;">
+								<button id="favoriteAddButton" class="button is-success" type="button" onclick="addFavorite()">Add favorite</button>
+								<button id="favoriteDeleteButton" class="button is-warning is-light" type="button" onclick="deleteFavorite()">Remove favorite</button>
+								<button id="wtbAddButton" class="button is-link is-light" type="button" onclick="addWT('wtb')">WTB</button>
+								<button id="wtbDeleteButton" class="button is-link" type="button" onclick="deleteWT('wtb')">Remove WTB</button>
+								<button id="wtsAddButton" class="button is-info is-light" type="button" onclick="addWT('wts')">WTS</button>
+								<button id="wtsDeleteButton" class="button is-info" type="button" onclick="deleteWT('wts')">Remove WTS</button>
+								<button class="button is-small is-link is-light" type="button" onclick="createAlertForSelected('artist')">Alert artist</button>
+								<button class="button is-small is-link is-light" type="button" onclick="createAlertForSelected('venue')">Alert venue</button>
+							</div>
 						</div>
 						<div class="column">
 							<figure class="image is-16by9">
 								<img id="detailPhoto" src="lib/concert.png" alt="Concert">
 							</figure>
+						</div>
+					</div>
+
+					<div class="columns mt-5">
+						<div class="column">
+							<h4 class="title is-5">Potential setlist</h4>
+							<div id="detailSetlist" class="content"></div>
+						</div>
+						<div class="column">
+							<h4 class="title is-5">SNS</h4>
+							<div id="detailSNS" class="tags"></div>
+						</div>
+						<div class="column">
+							<h4 class="title is-5">WTB / WTS</h4>
+							<div id="detailWT" class="content is-small"></div>
 						</div>
 					</div>
 				</div>

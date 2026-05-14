@@ -28,6 +28,27 @@ func ServeMux(db *sql.DB, clientDir string) *http.ServeMux {
 	mux.HandleFunc("GET /api/concerts", route(db, handleConcerts))
 	mux.HandleFunc("GET /api/concerts/{id}", route(db, handleConcertByID))
 
+	// setlist.go
+	mux.HandleFunc("GET /api/setlist/{id}", route(db, handleConcertSetlist))
+
+	// favorites.go
+	mux.HandleFunc("GET /api/favorites/{id}", route(db, handleConcertSNS))
+	mux.HandleFunc("POST /api/favorites/{id}", route(db, handleFavoriteAdd))
+	mux.HandleFunc("DELETE /api/favorites/{id}", route(db, handleFavoriteDelete))
+
+	// wt.go
+	mux.HandleFunc("GET /api/wt/{id}", route(db, handleConcertWT))
+	mux.HandleFunc("POST /api/wt/{id}", route(db, handleWTAdd))
+	mux.HandleFunc("DELETE /api/wt/{id}", route(db, handleWTDelete))
+
+	// profile.go
+	mux.HandleFunc("GET /api/me", route(db, handleProfileGet))
+	mux.HandleFunc("PATCH /api/me", route(db, handleProfilePatch))
+
+	// alerts.go
+	mux.HandleFunc("POST /api/alerts", route(db, handleAlertCreate))
+	mux.HandleFunc("DELETE /api/alerts/{alertId}", route(db, handleAlertDelete))
+
 	// auth.go
 	mux.HandleFunc("POST /api/auth/register", route(db, handleRegister))
 	mux.HandleFunc("POST /api/auth/login", route(db, handleLogin))

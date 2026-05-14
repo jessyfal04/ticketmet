@@ -80,8 +80,9 @@ CREATE TABLE IF NOT EXISTS favorites (
 CREATE TABLE IF NOT EXISTS alerts (
 	id INTEGER PRIMARY KEY,
 	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	target_type TEXT NOT NULL,
-	target_id INTEGER NOT NULL
+	target_type TEXT NOT NULL CHECK (target_type IN ('artist', 'venue')),
+	target_id INTEGER NOT NULL,
+	UNIQUE(user_id, target_type, target_id)
 );
 
 CREATE TABLE IF NOT EXISTS setlists (

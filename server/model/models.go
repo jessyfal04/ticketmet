@@ -86,6 +86,11 @@ type WT struct {
 	Type      WTType
 }
 
+type ProfileWT struct {
+	Type    string
+	Concert DisplayConcert
+}
+
 type Favorite struct {
 	UserID    int
 	ConcertID int

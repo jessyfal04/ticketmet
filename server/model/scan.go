@@ -14,6 +14,12 @@ func ScanVenue(row interface{ Scan(...any) error }) (Venue, error) {
 	return venue, err
 }
 
+func ScanString(row interface{ Scan(...any) error }) (string, error) {
+	var value string
+	err := row.Scan(&value)
+	return value, err
+}
+
 func ScanConcert(row interface{ Scan(...any) error }) (Concert, error) {
 	var concert Concert
 	var date string
@@ -89,6 +95,36 @@ func ScanWebAuthnChallenge(row interface{ Scan(...any) error }) (WebAuthnChallen
 	var challenge WebAuthnChallengeRow
 	err := row.Scan(&challenge.ID, &challenge.SessionData)
 	return challenge, err
+}
+
+func ScanProfileWT(row interface{ Scan(...any) error }) (ProfileWT, error) {
+	var wt ProfileWT
+	var date string
+	var photoURL string
+	var saleStart string
+	err := row.Scan(
+		&wt.Type,
+		&wt.Concert.ID,
+		&wt.Concert.Name,
+		&date,
+		&wt.Concert.VenueID,
+		&wt.Concert.ArtistID,
+		&wt.Concert.URL,
+		&photoURL,
+		&wt.Concert.SeatmapURL,
+		&saleStart,
+		&wt.Concert.VenueName,
+		&wt.Concert.ArtistName,
+	)
+	if err != nil {
+		return ProfileWT{}, err
+	}
+	wt.Concert.Date = parseTime(date)
+	if photoURL != "" {
+		wt.Concert.Photos = []string{photoURL}
+	}
+	wt.Concert.SaleStartDateTime = parseTime(saleStart)
+	return wt, nil
 }
 
 func parseTime(value string) time.Time {

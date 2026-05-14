@@ -15,7 +15,7 @@ import (
 
 const (
 	ticketmasterURL        = "https://app.ticketmaster.com/discovery/v2/events.json"
-	ticketmasterSyncEvery  = 15 * time.Minute
+	ticketmasterSyncEvery  = 5 * time.Minute
 	ticketmasterPageSize   = 200
 	ticketmasterMaxPages   = 5
 	ticketmasterMusicClass = "music"

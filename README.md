@@ -140,20 +140,19 @@ Setlist potentielle / par artiste (via attractions name)
 - DELETE /api/auth/passkeys/{credentialId}
   supprimer une passkey de l'utilisateur connecté
 
-## Requêtes prévues
-- GET /api/concerts/{concertId}/sns  
+- GET /api/favorites/{concertId}  
   voir les SNS des gens qui vont au même concert
 
-- GET /api/concerts/{concertId}/setlist  
+- GET /api/setlist/{concertId}  
   voir la setlist potentielle d'un concert
 
-- POST ou DELETE /api/concerts/{concertId}/favorites  
+- POST ou DELETE /api/favorites/{concertId}  
   ajouter ou retirer un favorite (active/désactive l'alert de vente)
 
-- POST ou DELETE /api/concerts/{concertId}/wt?type=wtb|wts  
+- POST ou DELETE /api/wt/{concertId}?type=wtb|wts  
   se mettre ou retirer en WTB ou WTS
 
-- GET /api/concerts/{concertId}/wt  
+- GET /api/wt/{concertId}  
   voir les WTB / WTS liés à un concert
 
 - POST /api/alerts?targetType=artist|venue&targetId=...
@@ -179,18 +178,18 @@ Setlist potentielle / par artiste (via attractions name)
 - Backend Go avec `net/http`, `database/sql`
 - Démarrage : `server/main/main.go`.
 - Schéma : `server/main/schema.sql`, appliqué au lancement après suppression de la DB existante. Pas de migration : quand le schéma change, la DB locale est écrasée au redémarrage.
-- API : `server/api`, handlers pour `/api/concerts`, `/api/artists`, `/api/venues`, `/healthz`.
+- API : `server/api`, handlers pour `/api/concerts`, `/api/artists`, `/api/venues`, `/api/setlist`, `/api/favorites`, `/api/wt`, `/api/me`, `/api/alerts`, `/healthz`.
 - Auth : email/password avec bcrypt, sessions serveur par cookie HttpOnly `session`, passkeys WebAuthn via `github.com/go-webauthn/webauthn`.
 - WebAuthn : domaine configuré dans `server/api/passkeys.go` pour `ticketmet.jessyfal04.dev`.
 - Sync Ticketmaster : `server/job/ticketmaster.go`, lancé dans une goroutine au démarrage puis toutes les 15 minutes.
 - Secrets : `.secrets/ticketmaster.mk`, chargé par le `Makefile`, ignoré par Git.
 - Déploiement : image Docker `docker.io/jessyfal04/ticketmet:latest`, DB persistée dans `/app/data/ticketmet.sqlite3`
-- Non implémenté pour l'instant : profil, favorites, WTB/WTS, alerts, SNS, setlist.fm.
+- Non implémenté pour l'instant : connexion à setlist.fm.
 
 ## Description client
 - Plan : application monopage avec sections Recherche, Fiche concert, Profil, Auth.
 - Recherche : liste + filtres ; appels `GET /api/concerts?artistID=...&venueID=...`, `GET /api/artists?search=...`, `GET /api/venues?search=...`.
-- Fiche concert : détails + setlist + SNS + WTB/WTS ; appels `GET /api/concerts/{concertId}`, `GET /api/concerts/{concertId}/setlist`, `GET /api/concerts/{concertId}/sns`, `GET /api/concerts/{concertId}/wt`, actions `POST/DELETE /api/concerts/{concertId}/favorites`, `POST/DELETE /api/concerts/{concertId}/wt`.
+- Fiche concert : détails + setlist + SNS + WTB/WTS ; appels `GET /api/concerts/{concertId}`, `GET /api/setlist/{concertId}`, `GET /api/favorites/{concertId}`, `GET /api/wt/{concertId}`, actions `POST/DELETE /api/favorites/{concertId}`, `POST/DELETE /api/wt/{concertId}`.
 - Profil : infos utilisateur et SNS ; appels `GET /api/me`, `PATCH /api/me`, création d'alerts via `POST /api/alerts`, suppression via `DELETE /api/alerts/{alertId}`.
 - Auth : écrans inscription/connexion/déconnexion ; appels `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, passkeys via `/api/auth/passkeys/...`.
 

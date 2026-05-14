@@ -5,6 +5,7 @@ let concerts = [];
 let selectedArtistID = "";
 let selectedVenueID = "";
 let selectedConcert = null;
+let profileData = null;
 
 $(function () {
 	showView("searchView");
@@ -74,6 +75,7 @@ function showView(viewID) {
 		renderAccount();
 		if (user) {
 			loadPasskeys();
+			loadProfile();
 		}
 	}
 }
@@ -92,7 +94,7 @@ function checkHealth() {
 function checkSession() {
 	api("GET", "/api/auth/me")
 		.done(function (response) {
-			user = response.user;
+			user = response.User;
 			toggleConnected(true);
 		})
 		.fail(function () {
@@ -107,7 +109,7 @@ function login() {
 
 	api("POST", "/api/auth/login", { email: email, password: password })
 		.done(function (response) {
-			user = response.user;
+			user = response.User;
 			toggleConnected(true);
 			setMessages("success", "Signed in.");
 		})
@@ -122,7 +124,7 @@ function register() {
 
 	api("POST", "/api/auth/register", { email: email, password: password })
 		.done(function (response) {
-			user = response.user;
+			user = response.User;
 			toggleConnected(true);
 			setMessages("success", "Account created.");
 		})
@@ -163,7 +165,7 @@ function emailExists() {
 
 	api("GET", "/api/auth/email-exists", { email: email })
 		.done(function (response) {
-			if (response.exists) {
+			if (response.Exists) {
 				$("#emailHelp").text("Email already registered.");
 				$("#registerButton").prop("disabled", true);
 				$("#loginButton").prop("disabled", false);
@@ -179,9 +181,13 @@ function toggleConnected(connected) {
 	$(".if-login").css("display", connected ? "" : "none");
 	$(".if-not-login").css("display", connected ? "none" : "");
 	$("#connectedEmail").text(user ? user.Email : "");
+	if (!connected) {
+		profileData = null;
+	}
 	renderAccount();
 	if (connected) {
 		loadPasskeys();
+		loadProfile();
 	}
 }
 
@@ -189,7 +195,11 @@ function renderAccount() {
 	if (!user) {
 		$("#accountID").text("");
 		$("#accountEmail").text("");
+		$("#profileSNS").val("");
 		$("#passkeysList").html("");
+		$("#profileFavorites").html("");
+		$("#profileWT").html("");
+		$("#profileAlerts").html("");
 		$("#unregisterPassword").val("");
 		return;
 	}
@@ -197,6 +207,151 @@ function renderAccount() {
 	$("#accountID").text(user.ID);
 	$("#accountEmail").text(user.Email);
 	$("#unregisterPassword").val("");
+	renderProfileData();
+}
+
+function loadProfile() {
+	if (!user) return;
+
+	api("GET", "/api/me")
+		.done(function (response) {
+			profileData = response;
+			renderProfileData();
+			renderConcertActions();
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Unable to load profile."));
+		});
+}
+
+function saveSNS() {
+	if (!user) return;
+
+	let sns = $("#profileSNS").val().split("\n").map(function (value) {
+		return value.trim();
+	}).filter(function (value) {
+		return value != "";
+	});
+
+	api("PATCH", "/api/me", { SNS: sns })
+		.done(function (response) {
+			profileData = response;
+			renderProfileData();
+			loadConcertFeatures();
+			setMessages("success", "SNS saved.");
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Unable to save SNS."));
+		});
+}
+
+function renderProfileData() {
+	if (!profileData) {
+		$("#profileFavorites").html(`<span class="has-text-grey">No data loaded.</span>`);
+		$("#profileWT").html(`<span class="has-text-grey">No data loaded.</span>`);
+		$("#profileAlerts").html(`<span class="has-text-grey">No data loaded.</span>`);
+		return;
+	}
+
+	let sns = profileData.SNS || [];
+	$("#profileSNS").val(sns.join("\n"));
+
+	renderProfileConcertList("#profileFavorites", profileData.Favorites || [], "No favorites yet.");
+	renderProfileWTList(profileData.WT || []);
+	renderProfileAlerts(profileData.Alerts || []);
+}
+
+function renderProfileConcertList(target, items, emptyText) {
+	if (items.length == 0) {
+		$(target).html(`<span class="has-text-grey">${escapeHTML(emptyText)}</span>`);
+		return;
+	}
+
+	let html = "<ul>";
+	for (let i = 0; i < items.length; i = i + 1) {
+		let concert = items[i];
+		html += `<li><button class="button is-small is-ghost p-0" type="button" onclick="openConcert('${escapeHTML(itemID(concert))}')">${escapeHTML(concert.Name)}</button></li>`;
+	}
+	html += "</ul>";
+	$(target).html(html);
+}
+
+function renderProfileWTList(items) {
+	if (items.length == 0) {
+		$("#profileWT").html(`<span class="has-text-grey">No WTB/WTS yet.</span>`);
+		return;
+	}
+
+	let html = "<ul>";
+	for (let i = 0; i < items.length; i = i + 1) {
+		let item = items[i];
+		let concert = item.Concert || {};
+		html += `<li><span class="tag is-light">${escapeHTML(String(item.Type).toUpperCase())}</span> <button class="button is-small is-ghost p-0" type="button" onclick="openConcert('${escapeHTML(itemID(concert))}')">${escapeHTML(concert.Name)}</button></li>`;
+	}
+	html += "</ul>";
+	$("#profileWT").html(html);
+}
+
+function renderProfileAlerts(items) {
+	if (items.length == 0) {
+		$("#profileAlerts").html(`<span class="has-text-grey">No alerts yet.</span>`);
+		return;
+	}
+
+	let html = "";
+	for (let i = 0; i < items.length; i = i + 1) {
+		let alert = items[i];
+		html += `
+			<div class="tags has-addons mb-1">
+				<span class="tag is-info is-light">${escapeHTML(alert.TargetType)} #${escapeHTML(alert.TargetID)}</span>
+				<span class="tag">${escapeHTML(alert.TargetName || "target")}</span>
+				<a class="tag is-delete" onclick="deleteAlert('${escapeHTML(alert.ID)}')"></a>
+			</div>`;
+	}
+	$("#profileAlerts").html(html);
+}
+
+
+function createAlertFromSelection(targetType) {
+	let targetID = targetType == "artist" ? selectedArtistID : selectedVenueID;
+	if (!targetID) {
+		setMessages("warning", "Select a " + targetType + " first.");
+		return;
+	}
+	createAlert(targetType, targetID);
+}
+
+function createAlertForSelected(targetType) {
+	if (!selectedConcert) return;
+	let targetID = targetType == "artist" ? selectedConcert.ArtistID : selectedConcert.VenueID;
+	createAlert(targetType, targetID);
+}
+
+function createAlert(targetType, targetID) {
+	if (!user) {
+		setMessages("warning", "Sign in first.");
+		return;
+	}
+
+	api("POST", "/api/alerts?targetType=" + encodeURIComponent(targetType) + "&targetId=" + encodeURIComponent(targetID))
+		.done(function () {
+			loadProfile();
+			setMessages("success", "Alert created.");
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Unable to create alert."));
+		});
+}
+
+function deleteAlert(id) {
+	api("DELETE", "/api/alerts/" + encodeURIComponent(id))
+		.done(function () {
+			loadProfile();
+			setMessages("success", "Alert deleted.");
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Unable to delete alert."));
+		});
 }
 
 // Search
@@ -312,6 +467,9 @@ function openConcert(id) {
 		.done(function (response) {
 			selectedConcert = response;
 			renderConcert();
+			if (user) {
+				loadProfile();
+			}
 			showView("detailView");
 		})
 		.fail(function (xhr) {
@@ -347,6 +505,156 @@ function renderConcert() {
 		photo = selectedConcert.Photos[0];
 	}
 	$("#detailPhoto").attr("src", photo);
+
+	renderConcertActions();
+	loadConcertFeatures();
+}
+
+function loadConcertFeatures() {
+	if (!selectedConcert) {
+		$("#detailSetlist").html("");
+		$("#detailSNS").html("");
+		$("#detailWT").html("");
+		return;
+	}
+
+	let id = encodeURIComponent(itemID(selectedConcert));
+
+	api("GET", "/api/setlist/" + id)
+		.done(function (response) {
+			let songs = response.Songs || [];
+			if (songs.length == 0) {
+				$("#detailSetlist").html(`<span class="has-text-grey">No setlist available.</span>`);
+				return;
+			}
+			let html = "<ol>";
+			for (let i = 0; i < songs.length; i = i + 1) {
+				html += `<li>${escapeHTML(songs[i])}</li>`;
+			}
+			html += "</ol>";
+			$("#detailSetlist").html(html);
+		})
+		.fail(function (xhr) {
+			$("#detailSetlist").html(escapeHTML(errorText(xhr, "Unable to load setlist.")));
+		});
+
+	api("GET", "/api/favorites/" + id)
+		.done(function (response) {
+			renderTags("#detailSNS", response.SNS || [], "No SNS yet.");
+		})
+		.fail(function (xhr) {
+			$("#detailSNS").html(escapeHTML(errorText(xhr, "Unable to load SNS.")));
+		});
+
+	api("GET", "/api/wt/" + id)
+		.done(function (response) {
+			renderWT(response);
+			renderConcertActions();
+		})
+		.fail(function (xhr) {
+			$("#detailWT").html(escapeHTML(errorText(xhr, "Unable to load WTB/WTS.")));
+		});
+}
+
+function renderWT(response) {
+	let wtb = response.WTB || [];
+	let wts = response.WTS || [];
+	let html = `
+		<p><strong>WTB:</strong> ${escapeHTML(wtb.length)}</p>
+		<div class="tags mb-2">${tagsHTML(wtb, "No WTB SNS.")}</div>
+		<p><strong>WTS:</strong> ${escapeHTML(wts.length)}</p>
+		<div class="tags">${tagsHTML(wts, "No WTS SNS.")}</div>`;
+	$("#detailWT").html(html);
+}
+
+function renderTags(target, values, emptyText) {
+	$(target).html(tagsHTML(values, emptyText));
+}
+
+function tagsHTML(values, emptyText) {
+	if (values.length == 0) {
+		return `<span class="tag is-light">${escapeHTML(emptyText)}</span>`;
+	}
+	let html = "";
+	for (let i = 0; i < values.length; i = i + 1) {
+		html += `<span class="tag is-info is-light">${escapeHTML(values[i])}</span>`;
+	}
+	return html;
+}
+
+function addFavorite() {
+	setFavorite("POST", "Favorite added.");
+}
+
+function deleteFavorite() {
+	setFavorite("DELETE", "Favorite removed.");
+}
+
+function setFavorite(method, message) {
+	if (!selectedConcert) return;
+	api(method, "/api/favorites/" + encodeURIComponent(itemID(selectedConcert)))
+		.done(function () {
+			loadProfile();
+			loadConcertFeatures();
+			setMessages("success", message);
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "Favorite update failed."));
+		});
+}
+
+function addWT(type) {
+	setWT("POST", type, String(type).toUpperCase() + " added.");
+}
+
+function deleteWT(type) {
+	setWT("DELETE", type, String(type).toUpperCase() + " removed.");
+}
+
+function setWT(method, type, message) {
+	if (!selectedConcert) return;
+	api(method, "/api/wt/" + encodeURIComponent(itemID(selectedConcert)) + "?type=" + encodeURIComponent(type))
+		.done(function () {
+			loadProfile();
+			loadConcertFeatures();
+			setMessages("success", message);
+		})
+		.fail(function (xhr) {
+			setMessages("danger", errorText(xhr, "WTB/WTS update failed."));
+		});
+}
+
+function renderConcertActions() {
+	if (!selectedConcert) return;
+
+	let concertID = String(itemID(selectedConcert));
+	let favorite = hasFavorite(concertID);
+	$("#favoriteAddButton").css("display", favorite ? "none" : "");
+	$("#favoriteDeleteButton").css("display", favorite ? "" : "none");
+
+	let mineWTB = hasWT(concertID, "wtb");
+	let mineWTS = hasWT(concertID, "wts");
+	$("#wtbAddButton").css("display", mineWTB ? "none" : "");
+	$("#wtbDeleteButton").css("display", mineWTB ? "" : "none");
+	$("#wtsAddButton").css("display", mineWTS ? "none" : "");
+	$("#wtsDeleteButton").css("display", mineWTS ? "" : "none");
+}
+
+function hasFavorite(concertID) {
+	let favorites = profileData ? profileData.Favorites || [] : [];
+	for (let i = 0; i < favorites.length; i = i + 1) {
+		if (String(itemID(favorites[i])) == String(concertID)) return true;
+	}
+	return false;
+}
+
+function hasWT(concertID, type) {
+	let items = profileData ? profileData.WT || [] : [];
+	for (let i = 0; i < items.length; i = i + 1) {
+		let concert = items[i].Concert || {};
+		if (String(itemID(concert)) == String(concertID) && String(items[i].Type) == type) return true;
+	}
+	return false;
 }
 
 // Passkeys
@@ -355,7 +663,7 @@ function loadPasskeys() {
 
 	api("GET", "/api/auth/passkeys")
 		.done(function (response) {
-			let passkeys = response.passkeys || [];
+			let passkeys = response.Passkeys || [];
 			$("#passkeysList").html("");
 
 			if (passkeys.length == 0) {
@@ -457,11 +765,11 @@ function loginPasskey() {
 								reject(new Error(errorText(xhr, "server validation refused")));
 							});
 					});
-				})
-				.then(function (response) {
-					user = response.user;
-					toggleConnected(true);
-					setMessages("success", "Signed in with passkey.");
+					})
+					.then(function (response) {
+						user = response.User;
+						toggleConnected(true);
+						setMessages("success", "Signed in with passkey.");
 				})
 				.catch(function (error) {
 					setMessages("danger", "Passkey sign in failed: " + passkeyError(error));

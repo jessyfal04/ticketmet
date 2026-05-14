@@ -14,6 +14,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type authUserResponse struct {
+	User model.PublicUser
+}
+
+type emailExistsResponse struct {
+	Exists bool
+}
 
 // Register a new user and open a session
 func handleRegister(w http.ResponseWriter, r *http.Request, db *sql.DB) {
@@ -79,7 +86,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
-	writeJSON(w, map[string]model.PublicUser{"user": user.Public()})
+	writeJSON(w, authUserResponse{User: user.Public()})
 }
 
 // Check password and open a session
@@ -107,7 +114,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if !createSessionCookie(w, r, db, user.ID) {
 		return
 	}
-	writeJSON(w, map[string]model.PublicUser{"user": user.Public()})
+	writeJSON(w, authUserResponse{User: user.Public()})
 }
 
 // Delete the current session
@@ -168,7 +175,7 @@ func handleMe(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	if !ok {
 		return
 	}
-	writeJSON(w, map[string]model.PublicUser{"user": user.Public()})
+	writeJSON(w, authUserResponse{User: user.Public()})
 }
 
 // Check if an email is already used
@@ -188,7 +195,7 @@ func handleEmailExists(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		logHttpError(w, http.StatusInternalServerError, "", err)
 		return
 	}
-	writeJSON(w, map[string]bool{"exists": exists})
+	writeJSON(w, emailExistsResponse{Exists: exists})
 }
 
 // Get the current user from the session cookie

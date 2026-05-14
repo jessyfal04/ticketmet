@@ -22,6 +22,18 @@ type webAuthnUser struct {
 	credentials []webauthn.Credential
 }
 
+type passkeyRegisterResponse struct {
+	OK bool
+}
+
+type passkeyLoginResponse struct {
+	User model.PublicUser
+}
+
+type passkeyListResponse struct {
+	Passkeys []model.PublicPasskey
+}
+
 // WebAuthnID returns the stable WebAuthn user handle.
 func (u webAuthnUser) WebAuthnID() []byte {
 	return []byte(strconv.Itoa(u.ID))
@@ -140,7 +152,7 @@ func handlePasskeyRegisterFinish(w http.ResponseWriter, r *http.Request, db *sql
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	writeJSON(w, map[string]bool{"ok": true})
+	writeJSON(w, passkeyRegisterResponse{OK: true})
 }
 
 // Start passkey login
@@ -237,7 +249,7 @@ func handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request, db *sql.DB
 	if !createSessionCookie(w, r, db, user.ID) {
 		return
 	}
-	writeJSON(w, map[string]model.PublicUser{"user": user.Public()})
+	writeJSON(w, passkeyLoginResponse{User: user.Public()})
 }
 
 // List current-user passkeys
@@ -265,7 +277,7 @@ func handlePasskeyList(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
-	writeJSON(w, map[string][]model.PublicPasskey{"passkeys": items})
+	writeJSON(w, passkeyListResponse{Passkeys: items})
 }
 
 // Delete one current-user passkey
