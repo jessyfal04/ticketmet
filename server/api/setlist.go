@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"net/http"
 	"server/job"
 )
@@ -12,8 +11,8 @@ type setlistResponse struct {
 }
 
 // Get the potential setlist for a concert.
-func handleConcertSetlist(setlistChan chan<- job.SetlistRequest) func(http.ResponseWriter, *http.Request, *sql.DB) {
-	return func(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+func handleConcertSetlist(setlistChan chan<- job.SetlistRequest) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		concertID, ok := httpGetIntParam(w, r, "id")
 		if !ok {
 			return

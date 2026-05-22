@@ -1,8 +1,8 @@
 package api
 
 import (
-	"database/sql"
 	"net/http"
+	"server/job"
 	"server/model"
 	"strings"
 )
@@ -12,68 +12,72 @@ type profileResponse struct {
 	SNS       []string
 	Favorites []model.DisplayConcert
 	WT        []model.ProfileWT
-	Alerts    []alertResponse
+	Alerts    []model.ProfileAlert
 }
 
 // Return the full current-user application profile.
-func handleProfileGet(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	user, ok := requireUser(w, r, db)
-	if !ok {
-		return
-	}
-
-	profile, err := loadProfile(r, db, user)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
-	writeJSON(w, profile)
-}
-
-// Update the current-user SNS handles.
-func handleProfilePatch(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	user, ok := requireUser(w, r, db)
-	if !ok {
-		return
-	}
-
-	var body struct {
-		SNS []string
-	}
-	if !readJSON(w, r, &body) {
-		return
-	}
-
-	if err := sqlExec(r, db, "DELETE FROM user_sns WHERE user_id = ?", user.ID); err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
-
-	seen := map[string]bool{}
-	for _, raw := range body.SNS {
-		sns := strings.TrimSpace(raw)
-		key := strings.ToLower(sns)
-		if sns == "" || seen[key] {
-			continue
+func handleProfileGet(dbChan chan<- job.DBRequest) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, r, dbChan)
+		if !ok {
+			return
 		}
-		seen[key] = true
-		if err := sqlExec(r, db, "INSERT INTO user_sns (user_id, sns) VALUES (?, ?)", user.ID, sns); err != nil {
+
+		profile, err := loadProfile(r, dbChan, user)
+		if err != nil {
 			logHttpError(w, http.StatusInternalServerError, "", err)
 			return
 		}
+		writeJSON(w, profile)
 	}
-
-	profile, err := loadProfile(r, db, user)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
-	writeJSON(w, profile)
 }
 
-func loadProfile(r *http.Request, db *sql.DB, user model.User) (profileResponse, error) {
+// Update the current-user SNS handles.
+func handleProfilePatch(dbChan chan<- job.DBRequest) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, r, dbChan)
+		if !ok {
+			return
+		}
+
+		var body struct {
+			SNS []string
+		}
+		if !readJSON(w, r, &body) {
+			return
+		}
+
+		if err := job.SqlExec(r.Context(), dbChan, "DELETE FROM user_sns WHERE user_id = ?", user.ID); err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+
+		seen := map[string]bool{}
+		for _, raw := range body.SNS {
+			sns := strings.TrimSpace(raw)
+			key := strings.ToLower(sns)
+			if sns == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			if err := job.SqlExec(r.Context(), dbChan, "INSERT INTO user_sns (user_id, sns) VALUES (?, ?)", user.ID, sns); err != nil {
+				logHttpError(w, http.StatusInternalServerError, "", err)
+				return
+			}
+		}
+
+		profile, err := loadProfile(r, dbChan, user)
+		if err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+		writeJSON(w, profile)
+	}
+}
+
+func loadProfile(r *http.Request, dbChan chan<- job.DBRequest, user model.User) (profileResponse, error) {
 	// Query SNS handles
-	sns, err := sqlScanList(r, db, `
+	sns, err := job.SqlScanList(r.Context(), dbChan, `
 		SELECT sns
 		FROM user_sns
 		WHERE user_id = ?
@@ -83,7 +87,7 @@ func loadProfile(r *http.Request, db *sql.DB, user model.User) (profileResponse,
 	}
 
 	// Query favorite concerts
-	favorites, err := sqlScanList(r, db, `
+	favorites, err := job.SqlScanList(r.Context(), dbChan, `
 		SELECT c.id,
 			c.name,
 			c.date,
@@ -106,7 +110,7 @@ func loadProfile(r *http.Request, db *sql.DB, user model.User) (profileResponse,
 	}
 
 	// Query WTB/WTS concerts
-	wtItems, err := sqlScanList(r, db, `
+	wtItems, err := job.SqlScanList(r.Context(), dbChan, `
 		SELECT wt.type,
 			c.id,
 			c.name,
@@ -130,7 +134,7 @@ func loadProfile(r *http.Request, db *sql.DB, user model.User) (profileResponse,
 	}
 
 	// Query alerts with their display name
-	alerts, err := sqlScanList(r, db, `
+	alerts, err := job.SqlScanList(r.Context(), dbChan, `
 		SELECT al.id,
 			al.target_type,
 			al.target_id,
@@ -139,11 +143,7 @@ func loadProfile(r *http.Request, db *sql.DB, user model.User) (profileResponse,
 		LEFT JOIN artists ar ON al.target_type = 'artist' AND ar.id = al.target_id
 		LEFT JOIN venues ve ON al.target_type = 'venue' AND ve.id = al.target_id
 		WHERE al.user_id = ?
-		ORDER BY al.id`, func(row interface{ Scan(...any) error }) (alertResponse, error) {
-		var alert alertResponse
-		err := row.Scan(&alert.ID, &alert.TargetType, &alert.TargetID, &alert.TargetName)
-		return alert, err
-	}, user.ID)
+		ORDER BY al.id`, model.ScanProfileAlert, user.ID)
 	if err != nil {
 		return profileResponse{}, err
 	}
@@ -156,5 +156,3 @@ func loadProfile(r *http.Request, db *sql.DB, user model.User) (profileResponse,
 		Alerts:    alerts,
 	}, nil
 }
-
-

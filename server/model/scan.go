@@ -2,25 +2,36 @@ package model
 
 import "time"
 
-func ScanArtist(row interface{ Scan(...any) error }) (Artist, error) {
+// Scanner is interface for scanning SQL rows.
+type Scanner interface {
+	Scan(...any) error
+}
+
+func ScanArtist(row Scanner) (Artist, error) {
 	var artist Artist
 	err := row.Scan(&artist.ID, &artist.Name)
 	return artist, err
 }
 
-func ScanVenue(row interface{ Scan(...any) error }) (Venue, error) {
+func ScanVenue(row Scanner) (Venue, error) {
 	var venue Venue
 	err := row.Scan(&venue.ID, &venue.Name, &venue.City, &venue.Country)
 	return venue, err
 }
 
-func ScanString(row interface{ Scan(...any) error }) (string, error) {
+func ScanString(row Scanner) (string, error) {
 	var value string
 	err := row.Scan(&value)
 	return value, err
 }
 
-func ScanConcert(row interface{ Scan(...any) error }) (Concert, error) {
+func ScanBool(row Scanner) (bool, error) {
+	var value bool
+	err := row.Scan(&value)
+	return value, err
+}
+
+func ScanConcert(row Scanner) (Concert, error) {
 	var concert Concert
 	var date string
 	var photoURL string
@@ -37,7 +48,7 @@ func ScanConcert(row interface{ Scan(...any) error }) (Concert, error) {
 	return concert, nil
 }
 
-func ScanDisplayConcert(row interface{ Scan(...any) error }) (DisplayConcert, error) {
+func ScanDisplayConcert(row Scanner) (DisplayConcert, error) {
 	var concert DisplayConcert
 	var date string
 	var photoURL string
@@ -66,13 +77,13 @@ func ScanDisplayConcert(row interface{ Scan(...any) error }) (DisplayConcert, er
 	return concert, nil
 }
 
-func ScanUser(row interface{ Scan(...any) error }) (User, error) {
+func ScanUser(row Scanner) (User, error) {
 	var user User
 	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash)
 	return user, err
 }
 
-func ScanPasskey(row interface{ Scan(...any) error }) (Passkey, error) {
+func ScanPasskey(row Scanner) (Passkey, error) {
 	var passkey Passkey
 	err := row.Scan(
 		&passkey.CredentialID,
@@ -86,18 +97,18 @@ func ScanPasskey(row interface{ Scan(...any) error }) (Passkey, error) {
 	return passkey, err
 }
 
-func ScanPublicPasskey(row interface{ Scan(...any) error }) (PublicPasskey, error) {
+func ScanPublicPasskey(row Scanner) (PublicPasskey, error) {
 	passkey, err := ScanPasskey(row)
 	return passkey.Public(), err
 }
 
-func ScanWebAuthnChallenge(row interface{ Scan(...any) error }) (WebAuthnChallengeRow, error) {
+func ScanWebAuthnChallenge(row Scanner) (WebAuthnChallengeRow, error) {
 	var challenge WebAuthnChallengeRow
 	err := row.Scan(&challenge.ID, &challenge.SessionData)
 	return challenge, err
 }
 
-func ScanProfileWT(row interface{ Scan(...any) error }) (ProfileWT, error) {
+func ScanProfileWT(row Scanner) (ProfileWT, error) {
 	var wt ProfileWT
 	var date string
 	var photoURL string
@@ -125,6 +136,12 @@ func ScanProfileWT(row interface{ Scan(...any) error }) (ProfileWT, error) {
 	}
 	wt.Concert.SaleStartDateTime = parseTime(saleStart)
 	return wt, nil
+}
+
+func ScanProfileAlert(row Scanner) (ProfileAlert, error) {
+	var alert ProfileAlert
+	err := row.Scan(&alert.ID, &alert.TargetType, &alert.TargetID, &alert.TargetName)
+	return alert, err
 }
 
 func parseTime(value string) time.Time {

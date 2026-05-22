@@ -1,6 +1,8 @@
 package model
 
-import "time"
+import (
+	"time"
+)
 
 type Concert struct {
 	ID                int
@@ -89,6 +91,13 @@ type WT struct {
 type ProfileWT struct {
 	Type    string
 	Concert DisplayConcert
+}
+
+type ProfileAlert struct {
+	ID         int
+	TargetType string
+	TargetID   int
+	TargetName string
 }
 
 type Favorite struct {

@@ -194,6 +194,7 @@ Setlist potentielle / par artiste (via attractions name)
 - Backend Go avec `net/http`, `database/sql`
 - Démarrage : `server/main/main.go`.
 - Schéma : `server/main/schema.sql`, appliqué au lancement. Pas de migration : quand le schéma change, la DB de déploiement est écrasée par `make docker-deploy`.
+- Accès DB : `server/job/database.go` lance le serveur de requêtes en goroutine ; on peut l'utiliser grâce au lanceurs sql utilisés par les APIs et les jobs.
 - API : `server/api`, handlers pour `/api/concerts`, `/api/artists`, `/api/venues`, `/api/setlist`, `/api/favorites`, `/api/wt`, `/api/me`, `/api/alerts`, `/healthz`.
 - Auth : email/password avec bcrypt, sessions serveur par cookie HttpOnly `session`, passkeys WebAuthn via `github.com/go-webauthn/webauthn`.
 - WebAuthn : domaine configuré dans `server/api/passkeys.go` pour `ticketmet.jessyfal04.dev`.

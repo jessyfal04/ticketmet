@@ -1,9 +1,7 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"server/job"
@@ -13,70 +11,70 @@ import (
 
 // ROUTES
 
-func ServeMux(db *sql.DB, clientDir string, mailChan chan<- job.Envelope, setlistChan chan<- job.SetlistRequest) *http.ServeMux {
+func ServeMux(clientDir string, dbChan chan<- job.DBRequest, mailChan chan<- job.Envelope, setlistChan chan<- job.SetlistRequest) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// health.go
-	mux.HandleFunc("GET /healthz", route(db, handleHealthz))
+	mux.HandleFunc("GET /healthz", toMuxHandler(handleHealthz()))
 
 	// artists.go
-	mux.HandleFunc("GET /api/artists", route(db, handleArtists))
+	mux.HandleFunc("GET /api/artists", toMuxHandler(handleArtists(dbChan)))
 
 	// venues.go
-	mux.HandleFunc("GET /api/venues", route(db, handleVenues))
+	mux.HandleFunc("GET /api/venues", toMuxHandler(handleVenues(dbChan)))
 
 	// concerts.go
-	mux.HandleFunc("GET /api/concerts", route(db, handleConcerts))
-	mux.HandleFunc("GET /api/concerts/{id}", route(db, handleConcertByID))
+	mux.HandleFunc("GET /api/concerts", toMuxHandler(handleConcerts(dbChan)))
+	mux.HandleFunc("GET /api/concerts/{id}", toMuxHandler(handleConcertByID(dbChan)))
 
 	// setlist.go
-	mux.HandleFunc("GET /api/setlist/{id}", route(db, handleConcertSetlist(setlistChan)))
+	mux.HandleFunc("GET /api/setlist/{id}", toMuxHandler(handleConcertSetlist(setlistChan)))
 
 	// favorites.go
-	mux.HandleFunc("GET /api/favorites/{id}", route(db, handleConcertSNS))
-	mux.HandleFunc("POST /api/favorites/{id}", route(db, handleFavoriteAdd))
-	mux.HandleFunc("DELETE /api/favorites/{id}", route(db, handleFavoriteDelete))
+	mux.HandleFunc("GET /api/favorites/{id}", toMuxHandler(handleConcertSNS(dbChan)))
+	mux.HandleFunc("POST /api/favorites/{id}", toMuxHandler(handleFavoriteAdd(dbChan)))
+	mux.HandleFunc("DELETE /api/favorites/{id}", toMuxHandler(handleFavoriteDelete(dbChan)))
 
 	// wt.go
-	mux.HandleFunc("GET /api/wt/{id}", route(db, handleConcertWT))
-	mux.HandleFunc("POST /api/wt/{id}", route(db, handleWTAdd))
-	mux.HandleFunc("DELETE /api/wt/{id}", route(db, handleWTDelete))
+	mux.HandleFunc("GET /api/wt/{id}", toMuxHandler(handleConcertWT(dbChan)))
+	mux.HandleFunc("POST /api/wt/{id}", toMuxHandler(handleWTAdd(dbChan)))
+	mux.HandleFunc("DELETE /api/wt/{id}", toMuxHandler(handleWTDelete(dbChan)))
 
 	// profile.go
-	mux.HandleFunc("GET /api/me", route(db, handleProfileGet))
-	mux.HandleFunc("PATCH /api/me", route(db, handleProfilePatch))
+	mux.HandleFunc("GET /api/me", toMuxHandler(handleProfileGet(dbChan)))
+	mux.HandleFunc("PATCH /api/me", toMuxHandler(handleProfilePatch(dbChan)))
 
 	// alerts.go
-	mux.HandleFunc("POST /api/alerts", route(db, handleAlertCreate))
-	mux.HandleFunc("DELETE /api/alerts/{alertId}", route(db, handleAlertDelete))
+	mux.HandleFunc("POST /api/alerts", toMuxHandler(handleAlertCreate(dbChan)))
+	mux.HandleFunc("DELETE /api/alerts/{alertId}", toMuxHandler(handleAlertDelete(dbChan)))
 
 	// auth.go
-	mux.HandleFunc("POST /api/auth/register", route(db, handleRegister(mailChan)))
-	mux.HandleFunc("POST /api/auth/login", route(db, handleLogin))
-	mux.HandleFunc("POST /api/auth/logout", route(db, handleLogout))
-	mux.HandleFunc("DELETE /api/auth/unregister", route(db, handleUnregister))
-	mux.HandleFunc("GET /api/auth/me", route(db, handleMe))
-	mux.HandleFunc("GET /api/auth/email-exists", route(db, handleEmailExists))
+	mux.HandleFunc("POST /api/auth/register", toMuxHandler(handleRegister(dbChan, mailChan)))
+	mux.HandleFunc("POST /api/auth/login", toMuxHandler(handleLogin(dbChan)))
+	mux.HandleFunc("POST /api/auth/logout", toMuxHandler(handleLogout(dbChan)))
+	mux.HandleFunc("DELETE /api/auth/unregister", toMuxHandler(handleUnregister(dbChan)))
+	mux.HandleFunc("GET /api/auth/me", toMuxHandler(handleMe(dbChan)))
+	mux.HandleFunc("GET /api/auth/email-exists", toMuxHandler(handleEmailExists(dbChan)))
 
 	// passkeys.go
-	mux.HandleFunc("POST /api/auth/passkeys/register/begin", route(db, handlePasskeyRegisterBegin))
-	mux.HandleFunc("POST /api/auth/passkeys/register/finish", route(db, handlePasskeyRegisterFinish))
-	mux.HandleFunc("POST /api/auth/passkeys/login/begin", route(db, handlePasskeyLoginBegin))
-	mux.HandleFunc("POST /api/auth/passkeys/login/finish", route(db, handlePasskeyLoginFinish))
-	mux.HandleFunc("GET /api/auth/passkeys", route(db, handlePasskeyList))
-	mux.HandleFunc("DELETE /api/auth/passkeys/{credentialId}", route(db, handlePasskeyDelete))
+	mux.HandleFunc("POST /api/auth/passkeys/register/begin", toMuxHandler(handlePasskeyRegisterBegin(dbChan)))
+	mux.HandleFunc("POST /api/auth/passkeys/register/finish", toMuxHandler(handlePasskeyRegisterFinish(dbChan)))
+	mux.HandleFunc("POST /api/auth/passkeys/login/begin", toMuxHandler(handlePasskeyLoginBegin(dbChan)))
+	mux.HandleFunc("POST /api/auth/passkeys/login/finish", toMuxHandler(handlePasskeyLoginFinish(dbChan)))
+	mux.HandleFunc("GET /api/auth/passkeys", toMuxHandler(handlePasskeyList(dbChan)))
+	mux.HandleFunc("DELETE /api/auth/passkeys/{credentialId}", toMuxHandler(handlePasskeyDelete(dbChan)))
 
 	// Frontend
-	mux.Handle("GET /", route(db, func(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	mux.Handle("GET /", toMuxHandler(func(w http.ResponseWriter, r *http.Request) {
 		http.FileServer(http.Dir(clientDir)).ServeHTTP(w, r)
 	}))
 	return mux
 }
 
-func route(db *sql.DB, handler func(http.ResponseWriter, *http.Request, *sql.DB)) http.HandlerFunc {
+func toMuxHandler(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s", r.Method, r.URL.String())
-		handler(w, r, db)
+		handler(w, r)
 	}
 }
 
@@ -148,74 +146,4 @@ func httpGetOptionalIntParam(w http.ResponseWriter, r *http.Request, name string
 		return nil, false
 	}
 	return i, true
-}
-
-// HELPERS SQL
-
-func sqlLikeSearch(search string) string {
-	search = strings.ToLower(strings.TrimSpace(search))
-	if search == "" {
-		return ""
-	}
-	return "%" + search + "%"
-}
-
-func sqlQueryList[T any](w http.ResponseWriter, r *http.Request, db *sql.DB, label string, query string, scan func(interface{ Scan(...any) error }) (T, error), args ...any) {
-	results, err := sqlScanList(r, db, query, scan, args...)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
-	writeJSON(w, results)
-}
-
-func sqlScanList[T any](r *http.Request, db *sql.DB, query string, scan func(interface{ Scan(...any) error }) (T, error), args ...any) ([]T, error) {
-	rows, err := db.QueryContext(r.Context(), query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []T
-	for rows.Next() {
-		item, err := scan(rows)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-func sqlQueryOne[T any](w http.ResponseWriter, r *http.Request, db *sql.DB, label string, query string, scan func(interface{ Scan(...any) error }) (T, error), args ...any) {
-	item, err := sqlScanOne(r, db, query, scan, args...)
-	if errors.Is(err, sql.ErrNoRows) {
-		logHttpError(w, http.StatusNotFound, "", nil)
-		return
-	}
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
-
-	writeJSON(w, item)
-}
-
-func sqlScanOne[T any](r *http.Request, db *sql.DB, query string, scan func(interface{ Scan(...any) error }) (T, error), args ...any) (T, error) {
-	row := db.QueryRowContext(r.Context(), query, args...)
-	return scan(row)
-}
-
-func sqlExec(r *http.Request, db *sql.DB, query string, args ...any) error {
-	_, err := db.ExecContext(r.Context(), query, args...)
-	return err
-}
-
-func sqlQueryBool(r *http.Request, db *sql.DB, query string, args ...any) (bool, error) {
-	var value bool
-	err := db.QueryRowContext(r.Context(), query, args...).Scan(&value)
-	return value, err
 }

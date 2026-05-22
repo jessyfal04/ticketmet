@@ -35,23 +35,26 @@ func main() {
 	}
 	defer db.Close()
 
+	dbServer := job.NewDBServer(db)
+	go dbServer.Run(context.Background())
+
 	// Start Ticketmaster sync
-	go job.RunTicketmaster(context.Background(), db, getenv("TICKETMASTER_API_KEY", ""), 15*time.Minute)
+	go job.RunTicketmaster(context.Background(), dbServer.C, getenv("TICKETMASTER_API_KEY", ""), 15*time.Minute)
 
 	// Start mailserver
 	mailServer := job.NewFromEnv()
 	go mailServer.Run(context.Background())
 
 	// Start alert radar
-	go job.RunAlertRadar(context.Background(), db, mailServer.C, time.Minute)
+	go job.RunAlertRadar(context.Background(), dbServer.C, mailServer.C, time.Minute)
 
 	// Start Setlist.fm
-	setlistServer := job.NewSetlistFMServer(db, getenv("SETLISTFM_API_KEY", ""))
+	setlistServer := job.NewSetlistFMServer(dbServer.C, getenv("SETLISTFM_API_KEY", ""))
 	go setlistServer.Run(context.Background())
 
 	// Start HTTP server
 	clientDir := getenv("CLIENT_DIR", "../client")
-	mux := api.ServeMux(db, clientDir, mailServer.C, setlistServer.C)
+	mux := api.ServeMux(clientDir, dbServer.C, mailServer.C, setlistServer.C)
 
 	addr := ":" + getenv("PORT", "8080")
 	log.Printf("Listening on %s", addr)
