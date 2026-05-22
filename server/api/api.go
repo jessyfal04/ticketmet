@@ -6,13 +6,14 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"server/job"
 	"strconv"
 	"strings"
 )
 
 // ROUTES
 
-func ServeMux(db *sql.DB, clientDir string) *http.ServeMux {
+func ServeMux(db *sql.DB, clientDir string, mailChan chan<- job.Envelope, setlistChan chan<- job.SetlistRequest) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// health.go
@@ -29,7 +30,7 @@ func ServeMux(db *sql.DB, clientDir string) *http.ServeMux {
 	mux.HandleFunc("GET /api/concerts/{id}", route(db, handleConcertByID))
 
 	// setlist.go
-	mux.HandleFunc("GET /api/setlist/{id}", route(db, handleConcertSetlist))
+	mux.HandleFunc("GET /api/setlist/{id}", route(db, handleConcertSetlist(setlistChan)))
 
 	// favorites.go
 	mux.HandleFunc("GET /api/favorites/{id}", route(db, handleConcertSNS))
@@ -50,7 +51,7 @@ func ServeMux(db *sql.DB, clientDir string) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/alerts/{alertId}", route(db, handleAlertDelete))
 
 	// auth.go
-	mux.HandleFunc("POST /api/auth/register", route(db, handleRegister))
+	mux.HandleFunc("POST /api/auth/register", route(db, handleRegister(mailChan)))
 	mux.HandleFunc("POST /api/auth/login", route(db, handleLogin))
 	mux.HandleFunc("POST /api/auth/logout", route(db, handleLogout))
 	mux.HandleFunc("DELETE /api/auth/unregister", route(db, handleUnregister))
@@ -74,9 +75,7 @@ func ServeMux(db *sql.DB, clientDir string) *http.ServeMux {
 
 func route(db *sql.DB, handler func(http.ResponseWriter, *http.Request, *sql.DB)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		method := r.Method
-		url := r.URL.String()
-		log.Printf("%s %s", method, url)
+		log.Printf("%s %s", r.Method, r.URL.String())
 		handler(w, r, db)
 	}
 }
@@ -113,8 +112,8 @@ func logHttpError(w http.ResponseWriter, status int, message string, err error) 
 	http.Error(w, message, status)
 }
 
-func httpGetParam(w http.ResponseWriter, r *http.Request, name string) (string, bool) {
-	value := r.PathValue(name)
+func httpGetStringParam(w http.ResponseWriter, r *http.Request, name string) (string, bool) {
+	value := strings.TrimSpace(r.PathValue(name))
 	if value == "" {
 		value = strings.TrimSpace(r.URL.Query().Get(name))
 	}
@@ -125,13 +124,30 @@ func httpGetParam(w http.ResponseWriter, r *http.Request, name string) (string, 
 	return value, true
 }
 
-func httpGetOptionalIntParam(r *http.Request, name string) any {
+func httpGetIntParam(w http.ResponseWriter, r *http.Request, name string) (int, bool) {
+	value, ok := httpGetStringParam(w, r, name)
+	if !ok {
+		return 0, false
+	}
+	i, err := strconv.Atoi(value)
+	if err != nil {
+		logHttpError(w, http.StatusBadRequest, "", nil)
+		return 0, false
+	}
+	return i, true
+}
+
+func httpGetOptionalIntParam(w http.ResponseWriter, r *http.Request, name string) (any, bool) {
 	value := strings.TrimSpace(r.URL.Query().Get(name))
 	if value == "" {
-		return nil
+		return nil, true
 	}
-	i, _ := strconv.Atoi(value)
-	return i
+	i, err := strconv.Atoi(value)
+	if err != nil {
+		logHttpError(w, http.StatusBadRequest, "", nil)
+		return nil, false
+	}
+	return i, true
 }
 
 // HELPERS SQL

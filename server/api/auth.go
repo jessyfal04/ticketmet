@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/mail"
+	"server/job"
 	"server/model"
 	"strings"
 	"time"
@@ -23,70 +24,79 @@ type emailExistsResponse struct {
 }
 
 // Register a new user and open a session
-func handleRegister(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Get email and password from request body
-	var body struct {
-		Email    string
-		Password string
-	}
-	if !readJSON(w, r, &body) {
-		return
-	}
+func handleRegister(mailChan chan<- job.Envelope) func(http.ResponseWriter, *http.Request, *sql.DB) {
+	return func(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+		// Get email and password from request body
+		var body struct {
+			Email    string
+			Password string
+		}
+		if !readJSON(w, r, &body) {
+			return
+		}
 
-	// Validate email and password
-	email := strings.ToLower(strings.TrimSpace(body.Email))
-	if _, err := mail.ParseAddress(email); err != nil || !strings.Contains(email, "@") {
-		logHttpError(w, http.StatusBadRequest, "invalid email", err)
-		return
-	}
-	if len(body.Password) < 8 {
-		logHttpError(w, http.StatusBadRequest, "password must be at least 8 characters", nil)
-		return
-	}
+		// Validate email and password
+		email := strings.ToLower(strings.TrimSpace(body.Email))
+		if _, err := mail.ParseAddress(email); err != nil || !strings.Contains(email, "@") {
+			logHttpError(w, http.StatusBadRequest, "invalid email", err)
+			return
+		}
+		if len(body.Password) < 8 {
+			logHttpError(w, http.StatusBadRequest, "password must be at least 8 characters", nil)
+			return
+		}
 
-	// Check email availability
-	exists, err := sqlQueryBool(r, db, "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", email)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
-	if exists {
-		logHttpError(w, http.StatusConflict, "email already exists", nil)
-		return
-	}
+		// Check email availability
+		exists, err := sqlQueryBool(r, db, "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", email)
+		if err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+		if exists {
+			logHttpError(w, http.StatusConflict, "email already exists", nil)
+			return
+		}
 
-	// Hash password
-	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
+		// Hash password
+		hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+		if err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", err)
+			return
+		}
 
-	// Insert user
-	err = sqlExec(r, db, `
-			INSERT INTO users (email, password_hash)
-			VALUES (?, ?)`, email, string(hash))
-	if err != nil {
-		logHttpError(w, http.StatusConflict, "email already exists", nil)
-		return
-	}
+		// Insert user
+		err = sqlExec(r, db, `
+				INSERT INTO users (email, password_hash)
+				VALUES (?, ?)`, email, string(hash))
+		if err != nil {
+			logHttpError(w, http.StatusConflict, "email already exists", nil)
+			return
+		}
 
-	// Reload inserted user
-	user, err := sqlScanOne(r, db, `
-			SELECT id, email, password_hash
-			FROM users
-			WHERE email = ?`, model.ScanUser, email)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
-	}
+		// Reload inserted user
+		user, err := sqlScanOne(r, db, `
+				SELECT id, email, password_hash
+				FROM users
+				WHERE email = ?`, model.ScanUser, email)
+		if err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", err)
+			return
+		}
 
-	// Open session
-	if !createSessionCookie(w, r, db, user.ID) {
-		return
-	}
+		// Open session
+		if !createSessionCookie(w, r, db, user.ID) {
+			return
+		}
 
-	writeJSON(w, authUserResponse{User: user.Public()})
+		// Send welcome email
+		envelope := job.Envelope{
+			Dst:     user.Email,
+			Message: job.WelcomeMail(user.Email),
+		}
+		mailChan <- envelope
+
+		writeJSON(w, authUserResponse{User: user.Public()})
+	}
 }
 
 // Check password and open a session
@@ -181,7 +191,7 @@ func handleMe(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 // Check if an email is already used
 func handleEmailExists(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Get email from query parameter
-	value, ok := httpGetParam(w, r, "email")
+	value, ok := httpGetStringParam(w, r, "email")
 	if !ok {
 		return
 	}

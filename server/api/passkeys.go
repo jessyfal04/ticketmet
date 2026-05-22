@@ -289,7 +289,7 @@ func handlePasskeyDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	}
 
 	// Delete credential
-	credentialId, ok := httpGetParam(w, r, "credentialId")
+	credentialId, ok := httpGetStringParam(w, r, "credentialId")
 	if !ok {
 		return
 	}

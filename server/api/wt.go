@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"server/model"
-	"strconv"
 	"strings"
 )
 
@@ -16,13 +15,8 @@ type wtResponse struct {
 // Get WTB/WTS information for a concert.
 func handleConcertWT(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Get concert ID
-	idParam, ok := httpGetParam(w, r, "id")
+	concertID, ok := httpGetIntParam(w, r, "id")
 	if !ok {
-		return
-	}
-	concertID, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 
@@ -62,13 +56,8 @@ func handleWTAdd(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	}
 
 	// Get concert ID
-	idParam, ok := httpGetParam(w, r, "id")
+	concertID, ok := httpGetIntParam(w, r, "id")
 	if !ok {
-		return
-	}
-	concertID, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 
@@ -109,13 +98,8 @@ func handleWTDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	}
 
 	// Get concert ID
-	idParam, ok := httpGetParam(w, r, "id")
+	concertID, ok := httpGetIntParam(w, r, "id")
 	if !ok {
-		return
-	}
-	concertID, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 
@@ -137,7 +121,7 @@ func handleWTDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 }
 
 func wtTypeParam(w http.ResponseWriter, r *http.Request) (string, bool) {
-	value, ok := httpGetParam(w, r, "type")
+	value, ok := httpGetStringParam(w, r, "type")
 	if !ok {
 		return "", false
 	}

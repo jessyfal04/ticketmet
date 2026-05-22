@@ -26,7 +26,7 @@ Elle facilite la mise en relation via les SNS pour faire du WTB/WTS et pour se r
 
 ## Liste de données
 - Concert
-  - id / name / date / venueID / artistID / url / photoURL / seatmapURL / saleStartDateTime
+  - id / name / date / venueID / artistID / url / photoURL / seatmapURL / saleStartDateTime / createdAt
 - Venue
   - id / name / city / country
 - Artist
@@ -44,7 +44,7 @@ Elle facilite la mise en relation via les SNS pour faire du WTB/WTS et pour se r
 - Favorite
   - userId / concertId
 - Alert
-  - id / userId / targetType / targetId
+  - id / userId / targetType / targetId / createdAt
 - SyncTicketmaster
   - lastPublicVisibilityStartDateTime (ex: 2026-03-24T21:59:47Z)
 
@@ -85,6 +85,7 @@ Setlist potentielle / par artiste (via attractions name)
 - Le job Ticketmaster tourne en goroutine background.
 - Nettoyage sync actuel : ignore les events sans venue/artiste nommé, garde une seule photo, ignore les dates de vente aberrantes avant 2000
 - Vérification des alerts utilisateur vis à vis des venues / artists
+- Déduplication des notifications déjà envoyées via `notifications.dedupe_key`
 - Vérification des alerts de vente pour les concerts en favorites
 - Récup setlist du concert si artiste dispo dans setlist.fm
 
@@ -167,6 +168,21 @@ Setlist potentielle / par artiste (via attractions name)
 - PATCH /api/me  
   modifier le profil (sns)
 
+
+## Mail
+- Le serveur mail applicatif est dans `server/job/mailserver.go`.
+- Il tourne en goroutine et consomme des `job.Envelope` depuis un canal buffered.
+- L'inscription pousse un mail de bienvenue dans le canal après création de session : la réponse HTTP n'attend pas l'envoi SMTP.
+- Si `SMTP_HOST` est vide, le mail est désactivé sans bloquer l'application.
+- Configuration SMTP :
+  - `SMTP_HOST` : serveur SMTP, par exemple `10.66.66.1` depuis Docker/VPN
+  - `SMTP_PORT` : port SMTP, par défaut `25`
+  - `SMTP_FROM` : expéditeur, par défaut `ticketmet@jessyfal04.dev`
+  - `SMTP_USER` / `SMTP_PASSWORD` : optionnels, si le serveur demande une auth
+  - `SMTP_TLS=starttls` : optionnel, seulement si on veut explicitement STARTTLS
+  - `APP_BASE_URL` : URL utilisée dans les boutons de mail, par défaut `https://ticketmet.jessyfal04.dev`
+- Le template HTML centralise une zone dédiée au contenu du mail, une carte indiquant l'adresse du compte et un bouton d'action.
+
 ## Flux du Système
 - client -> serveur : requêtes HTTP
 - serveur -> client : réponses JSON
@@ -177,14 +193,14 @@ Setlist potentielle / par artiste (via attractions name)
 ## Description serveur
 - Backend Go avec `net/http`, `database/sql`
 - Démarrage : `server/main/main.go`.
-- Schéma : `server/main/schema.sql`, appliqué au lancement après suppression de la DB existante. Pas de migration : quand le schéma change, la DB locale est écrasée au redémarrage.
+- Schéma : `server/main/schema.sql`, appliqué au lancement. Pas de migration : quand le schéma change, la DB de déploiement est écrasée par `make docker-deploy`.
 - API : `server/api`, handlers pour `/api/concerts`, `/api/artists`, `/api/venues`, `/api/setlist`, `/api/favorites`, `/api/wt`, `/api/me`, `/api/alerts`, `/healthz`.
 - Auth : email/password avec bcrypt, sessions serveur par cookie HttpOnly `session`, passkeys WebAuthn via `github.com/go-webauthn/webauthn`.
 - WebAuthn : domaine configuré dans `server/api/passkeys.go` pour `ticketmet.jessyfal04.dev`.
 - Sync Ticketmaster : `server/job/ticketmaster.go`, lancé dans une goroutine au démarrage puis toutes les 15 minutes.
 - Secrets : `.secrets/ticketmaster.mk`, chargé par le `Makefile`, ignoré par Git.
 - Déploiement : image Docker `docker.io/jessyfal04/ticketmet:latest`, DB persistée dans `/app/data/ticketmet.sqlite3`
-- Non implémenté pour l'instant : connexion à setlist.fm.
+- Setlist.fm : `server/job/setlistfm.go`, lancé dans une goroutine au démarrage et utilisé par `GET /api/setlist/{concertId}` si `SETLISTFM_API_KEY` est fourni.
 
 ## Description client
 - Plan : application monopage avec sections Recherche, Fiche concert, Profil, Auth.

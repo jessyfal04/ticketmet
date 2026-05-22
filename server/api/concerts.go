@@ -4,14 +4,19 @@ import (
 	"database/sql"
 	"net/http"
 	"server/model"
-	"strconv"
 )
 
 // Get a list of concerts, optionally filtered by artistID and/or venueID
 func handleConcerts(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Get optional artistID and venueID query parameters
-	artistFilter := httpGetOptionalIntParam(r, "artistID")
-	venueFilter := httpGetOptionalIntParam(r, "venueID")
+	artistFilter, ok := httpGetOptionalIntParam(w, r, "artistID")
+	if !ok {
+		return
+	}
+	venueFilter, ok := httpGetOptionalIntParam(w, r, "venueID")
+	if !ok {
+		return
+	}
 
 	// Query concerts with optional filters
 	sqlQueryList(w, r, db, "concerts", `
@@ -36,15 +41,8 @@ func handleConcerts(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 // Get a concert by ID
 func handleConcertByID(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Get the id parameter from the URL path
-	idParam, ok := httpGetParam(w, r, "id")
+	id, ok := httpGetIntParam(w, r, "id")
 	if !ok {
-		return
-	}
-
-	// Convert id to integer
-	id, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 

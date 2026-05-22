@@ -3,37 +3,27 @@ package api
 import (
 	"database/sql"
 	"net/http"
-	"server/model"
-	"strconv"
+	"server/job"
 )
 
 type setlistResponse struct {
-	Songs []string
+	Songs   []string
+	Fetched bool
 }
 
 // Get the potential setlist for a concert.
-func handleConcertSetlist(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Get concert ID
-	idParam, ok := httpGetParam(w, r, "id")
-	if !ok {
-		return
-	}
-	concertID, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
-		return
-	}
+func handleConcertSetlist(setlistChan chan<- job.SetlistRequest) func(http.ResponseWriter, *http.Request, *sql.DB) {
+	return func(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+		concertID, ok := httpGetIntParam(w, r, "id")
+		if !ok {
+			return
+		}
 
-	// Query setlist songs
-	songs, err := sqlScanList(r, db, `
-		SELECT song_name
-		FROM setlists
-		WHERE concert_id = ?
-		ORDER BY song_order`, model.ScanString, concertID)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return
+		result, err := job.RequestSetlist(r.Context(), setlistChan, concertID)
+		if err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", err)
+			return
+		}
+		writeJSON(w, setlistResponse{Songs: result.Songs, Fetched: result.Fetched})
 	}
-
-	writeJSON(w, setlistResponse{Songs: songs})
 }

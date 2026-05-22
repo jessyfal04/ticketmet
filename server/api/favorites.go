@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"server/model"
-	"strconv"
 )
 
 type concertSNSResponse struct {
@@ -14,13 +13,8 @@ type concertSNSResponse struct {
 // Get public SNS handles from users interested in the same concert.
 func handleConcertSNS(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Get concert ID
-	idParam, ok := httpGetParam(w, r, "id")
+	concertID, ok := httpGetIntParam(w, r, "id")
 	if !ok {
-		return
-	}
-	concertID, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 
@@ -48,13 +42,8 @@ func handleFavoriteAdd(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	}
 
 	// Get concert ID
-	idParam, ok := httpGetParam(w, r, "id")
+	concertID, ok := httpGetIntParam(w, r, "id")
 	if !ok {
-		return
-	}
-	concertID, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 
@@ -89,13 +78,8 @@ func handleFavoriteDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	}
 
 	// Get concert ID
-	idParam, ok := httpGetParam(w, r, "id")
+	concertID, ok := httpGetIntParam(w, r, "id")
 	if !ok {
-		return
-	}
-	concertID, err := strconv.Atoi(idParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 

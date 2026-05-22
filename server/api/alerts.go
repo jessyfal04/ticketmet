@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -25,14 +24,21 @@ func handleAlertCreate(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
-	targetType := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("targetType")))
+	targetType, ok := httpGetStringParam(w, r, "targetType")
+	if !ok {
+		return
+	}
+	targetType = strings.ToLower(targetType)
 	if targetType != "artist" && targetType != "venue" {
 		logHttpError(w, http.StatusBadRequest, "invalid target type", nil)
 		return
 	}
 
-	targetID, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("targetId")))
-	if err != nil || targetID <= 0 {
+	targetID, ok := httpGetIntParam(w, r, "targetId")
+	if !ok {
+		return
+	}
+	if targetID <= 0 {
 		logHttpError(w, http.StatusBadRequest, "invalid target id", nil)
 		return
 	}
@@ -58,13 +64,8 @@ func handleAlertDelete(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
-	alertIDParam, ok := httpGetParam(w, r, "alertId")
+	alertID, ok := httpGetIntParam(w, r, "alertId")
 	if !ok {
-		return
-	}
-	alertID, err := strconv.Atoi(alertIDParam)
-	if err != nil {
-		logHttpError(w, http.StatusBadRequest, "", nil)
 		return
 	}
 

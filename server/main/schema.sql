@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS concerts (
 	url TEXT NOT NULL,
 	photo_url TEXT NOT NULL DEFAULT '',
 	seatmap_url TEXT NOT NULL DEFAULT '',
-	sale_start_datetime TEXT NOT NULL
+	sale_start_datetime TEXT NOT NULL,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -82,7 +83,12 @@ CREATE TABLE IF NOT EXISTS alerts (
 	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	target_type TEXT NOT NULL CHECK (target_type IN ('artist', 'venue')),
 	target_id INTEGER NOT NULL,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	UNIQUE(user_id, target_type, target_id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+	dedupe_key TEXT PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS setlists (
