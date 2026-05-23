@@ -25,6 +25,12 @@ func ScanString(row Scanner) (string, error) {
 	return value, err
 }
 
+func ScanInt(row Scanner) (int, error) {
+	var value int
+	err := row.Scan(&value)
+	return value, err
+}
+
 func ScanBool(row Scanner) (bool, error) {
 	var value bool
 	err := row.Scan(&value)

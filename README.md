@@ -62,7 +62,7 @@ Setlist potentielle / par artiste (via attractions name)
   - Filtre nouveauté : ajouter `publicVisibilityStartDateTime=YYYY-MM-DDTHH:MM:SSZ` (ex: `2026-03-24T21:59:47Z`)
   - Champs utiles :
     - event.id, event.name, event.url
-    - event.images[].url (une seule image retenue, la première URL non vide)
+    - event.images[].url (une seule image retenue, la meilleure image 16:9 si possible)
     - event.seatmap.staticUrl
     - event.dates.start.localDate / localTime / dateTime
     - event.sales.public.startDateTime
@@ -80,10 +80,10 @@ Setlist potentielle / par artiste (via attractions name)
 ## Mise à jour
 - publicVisibilityStartDateTime : filtre de nouveauté (SyncTicketmaster.lastPublicVisibilityStartDateTime)
 - Récupération + insertion des concerts via Ticketmaster
-- Pays synchronisés pour l'instant : Allemagne (`DE`) et France (`FR`)
+- Pays synchronisés pour l'instant : Allemagne (`DE`), France (`FR`), Italie (`IT`), Espagne (`ES`) et Autriche (`AT`)
 - Job automatique toutes les 15 minutes, avec clé Ticketmaster fournie par le shell (`TICKETMASTER_API_KEY`)
 - Le job Ticketmaster tourne en goroutine background.
-- Nettoyage sync actuel : ignore les events sans venue/artiste nommé, garde une seule photo, ignore les dates de vente aberrantes avant 2000
+- Nettoyage sync actuel : ignore les events sans venue/artiste nommé, garde une seule photo 16:9 de meilleure qualité, ignore les dates de vente aberrantes avant 2000
 - Vérification des alerts utilisateur vis à vis des venues / artists
 - Déduplication des notifications déjà envoyées via `notifications.dedupe_key`
 - Vérification des alerts de vente pour les concerts en favorites
@@ -93,17 +93,17 @@ Setlist potentielle / par artiste (via attractions name)
 - GET /healthz
   healthcheck serveur
 
-- GET /api/concerts?artistID=...&venueID=...
-  liste des concerts, avec filtre optionnel par artiste ou salle
+- GET /api/concerts?artistID=...&venueID=...&country=...&status=future|all&page=1
+  liste des concerts, avec filtre optionnel par artiste, salle, pays et pagination
 
 - GET /api/concerts/{concertId}
   détail d'un concert
 
-- GET /api/artists?search=...
-  autocomplétion artists -> id
+- GET /api/artists
+  liste des artistes -> id
 
-- GET /api/venues?search=...
-  autocomplétion venues -> id
+- GET /api/venues
+  liste des salles -> id
 
 - POST /api/auth/register
   créer un compte email/password, ouvrir une session cookie
@@ -152,6 +152,8 @@ Setlist potentielle / par artiste (via attractions name)
 
 - POST ou DELETE /api/wt/{concertId}?type=wtb|wts  
   se mettre ou retirer en WTB ou WTS
+  - `POST` remplace l'autre statut du même user sur le même concert
+  - `POST` sur un concert expiré renvoie `409`
 
 - GET /api/wt/{concertId}  
   voir les WTB / WTS liés à un concert
@@ -205,7 +207,7 @@ Setlist potentielle / par artiste (via attractions name)
 
 ## Description client
 - Plan : application monopage avec sections Recherche, Fiche concert, Profil, Auth.
-- Recherche : liste + filtres ; appels `GET /api/concerts?artistID=...&venueID=...`, `GET /api/artists?search=...`, `GET /api/venues?search=...`.
+- Recherche : liste + filtres + pagination ; appels `GET /api/concerts?artistID=...&venueID=...&country=...&status=...&page=...`, `GET /api/artists`, `GET /api/venues`.
 - Fiche concert : détails + setlist + SNS + WTB/WTS ; appels `GET /api/concerts/{concertId}`, `GET /api/setlist/{concertId}`, `GET /api/favorites/{concertId}`, `GET /api/wt/{concertId}`, actions `POST/DELETE /api/favorites/{concertId}`, `POST/DELETE /api/wt/{concertId}`.
 - Profil : infos utilisateur et SNS ; appels `GET /api/me`, `PATCH /api/me`, création d'alerts via `POST /api/alerts`, suppression via `DELETE /api/alerts/{alertId}`.
 - Auth : écrans inscription/connexion/déconnexion ; appels `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, passkeys via `/api/auth/passkeys/...`.

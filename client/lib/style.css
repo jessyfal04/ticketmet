@@ -13,3 +13,9 @@
 #detailPhoto {
 	object-fit: cover;
 }
+
+.ticketmet-concert-card--expired,
+.ticketmet-concert-detail--expired {
+	opacity: 0.72;
+	filter: grayscale(0.45);
+}

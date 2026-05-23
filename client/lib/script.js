@@ -4,14 +4,26 @@ let venues = [];
 let concerts = [];
 let selectedArtistID = "";
 let selectedVenueID = "";
+let selectedCountry = "";
+let selectedStatus = "future";
 let selectedConcert = null;
 let profileData = null;
+let messageTimer = null;
+let saveSNSDelay = null;
+let concertPage = 1;
+let concertHasMore = true;
+let concertLoading = false;
+let concertRequestNonce = 0;
 
 $(function () {
 	showView("searchView");
 	checkHealth();
 	checkSession();
-	loadConcerts();
+	loadArtists();
+	loadVenues();
+	loadConcerts(true);
+	$(window).on("scroll", handleConcertScroll);
+	handleConcertQueryParam();
 });
 
 function api(method, url, data) {
@@ -37,12 +49,32 @@ function setMessages(type, message) {
 		return;
 	}
 
-	$("#messages").html(`
-		<div class="notification is-${type}">
-			<button class="delete" onclick="setMessages('', '')"></button>
+	let notification = $(`
+		<div class="notification is-${type} mx-5" style="display:none;">
+			<button class="delete" type="button"></button>
 			${escapeHTML(message)}
 		</div>
 	`);
+	notification.find(".delete").on("click", function () {
+		notification.remove();
+	});
+	$("#messages").html("").append(notification);
+	notification.fadeIn(150);
+	window.clearTimeout(messageTimer);
+	messageTimer = window.setTimeout(function () {
+		notification.fadeOut(200, function () {
+			notification.remove();
+		});
+	}, 5000);
+}
+
+function handleConcertQueryParam() {
+	let concertID = new URLSearchParams(window.location.search).get("concert");
+	if (!concertID) return;
+
+	openConcert(concertID).done(function () {
+		window.history.replaceState({}, document.title, window.location.pathname);
+	});
 }
 
 function escapeHTML(value) {
@@ -60,6 +92,10 @@ function field(obj, names, fallback) {
 
 function itemID(obj) {
 	return field(obj, ["ID", "id"], "");
+}
+
+function itemName(obj) {
+	return field(obj, ["Name", "name"], "");
 }
 
 function showView(viewID) {
@@ -84,10 +120,10 @@ function showView(viewID) {
 function checkHealth() {
 	$.ajax({ method: "GET", url: "/healthz" })
 		.done(function () {
-			$("#healthStatus").removeClass("is-warning is-danger").addClass("is-success").text("API online");
+			$("#healthStatus").removeClass("is-warning is-danger").addClass("is-success").text("");
 		})
 		.fail(function () {
-			$("#healthStatus").removeClass("is-warning is-success").addClass("is-danger").text("API offline");
+			$("#healthStatus").removeClass("is-warning is-success").addClass("is-danger").text("");
 		});
 }
 
@@ -185,6 +221,7 @@ function toggleConnected(connected) {
 		profileData = null;
 	}
 	renderAccount();
+	renderAlertBlock();
 	if (connected) {
 		loadPasskeys();
 		loadProfile();
@@ -196,6 +233,8 @@ function renderAccount() {
 		$("#accountID").text("");
 		$("#accountEmail").text("");
 		$("#profileSNS").val("");
+		$("#profileSNS").removeClass("is-success");
+		$("#profileSNS").removeClass("is-danger");
 		$("#passkeysList").html("");
 		$("#profileFavorites").html("");
 		$("#profileWT").html("");
@@ -217,6 +256,7 @@ function loadProfile() {
 		.done(function (response) {
 			profileData = response;
 			renderProfileData();
+			renderAlertBlock();
 			renderConcertActions();
 		})
 		.fail(function (xhr) {
@@ -226,6 +266,7 @@ function loadProfile() {
 
 function saveSNS() {
 	if (!user) return;
+	window.clearTimeout(saveSNSDelay);
 
 	let sns = $("#profileSNS").val().split("\n").map(function (value) {
 		return value.trim();
@@ -238,11 +279,27 @@ function saveSNS() {
 			profileData = response;
 			renderProfileData();
 			loadConcertFeatures();
+			$("#profileSNS").removeClass("is-danger");
+			$("#profileSNS").addClass("is-success");
 			setMessages("success", "SNS saved.");
 		})
 		.fail(function (xhr) {
+			$("#profileSNS").removeClass("is-success");
+			$("#profileSNS").addClass("is-danger");
 			setMessages("danger", errorText(xhr, "Unable to save SNS."));
 		});
+}
+
+function profileSNSInput() {
+	$("#profileSNS").removeClass("is-success");
+	$("#profileSNS").addClass("is-danger");
+	scheduleSaveSNS();
+}
+
+function scheduleSaveSNS() {
+	if (!user) return;
+	window.clearTimeout(saveSNSDelay);
+	saveSNSDelay = window.setTimeout(saveSNS, 500);
 }
 
 function renderProfileData() {
@@ -255,10 +312,44 @@ function renderProfileData() {
 
 	let sns = profileData.SNS || [];
 	$("#profileSNS").val(sns.join("\n"));
+	$("#profileSNS").removeClass("is-danger");
+	$("#profileSNS").addClass("is-success");
 
 	renderProfileConcertList("#profileFavorites", profileData.Favorites || [], "No favorites yet.");
 	renderProfileWTList(profileData.WT || []);
 	renderProfileAlerts(profileData.Alerts || []);
+}
+
+function renderAlertBlock() {
+	let target = $("#alertBlock");
+	if (!user) {
+		target.html(`<span class="has-text-grey">Sign in to create artist or venue alerts.</span>`);
+		return;
+	}
+
+	let artist = selectedArtistID ? selectedName(artists, selectedArtistID) : "All artists";
+	let venue = selectedVenueID ? selectedName(venues, selectedVenueID) : "All venues";
+	let artistAlert = getAlert("artist", selectedArtistID);
+	let venueAlert = getAlert("venue", selectedVenueID);
+	target.html(`
+		<div class="content mb-3">
+			<p class="mb-1"><strong>Artist:</strong> ${escapeHTML(artist)}</p>
+			<p><strong>Venue:</strong> ${escapeHTML(venue)}</p>
+		</div>
+		<div class="buttons">
+			<button class="button ${artistAlert ? "is-warning" : "is-link"} is-light" type="button" ${selectedArtistID ? "" : "disabled"} onclick="createAlertFromSelection('artist')">${artistAlert ? "Remove artist alert" : "Alert this artist"}</button>
+			<button class="button ${venueAlert ? "is-warning" : "is-link"} is-light" type="button" ${selectedVenueID ? "" : "disabled"} onclick="createAlertFromSelection('venue')">${venueAlert ? "Remove venue alert" : "Alert this venue"}</button>
+		</div>
+	`);
+}
+
+function selectedName(items, id) {
+	for (let i = 0; i < items.length; i = i + 1) {
+		if (String(itemID(items[i])) == String(id)) {
+			return itemName(items[i]);
+		}
+	}
+	return "Selected #" + id;
 }
 
 function renderProfileConcertList(target, items, emptyText) {
@@ -318,13 +409,13 @@ function createAlertFromSelection(targetType) {
 		setMessages("warning", "Select a " + targetType + " first.");
 		return;
 	}
-	createAlert(targetType, targetID);
+	toggleAlert(targetType, targetID);
 }
 
 function createAlertForSelected(targetType) {
 	if (!selectedConcert) return;
 	let targetID = targetType == "artist" ? selectedConcert.ArtistID : selectedConcert.VenueID;
-	createAlert(targetType, targetID);
+	toggleAlert(targetType, targetID);
 }
 
 function createAlert(targetType, targetID) {
@@ -343,6 +434,15 @@ function createAlert(targetType, targetID) {
 		});
 }
 
+function toggleAlert(targetType, targetID) {
+	let alert = getAlert(targetType, targetID);
+	if (alert) {
+		deleteAlert(alert.ID);
+		return;
+	}
+	createAlert(targetType, targetID);
+}
+
 function deleteAlert(id) {
 	api("DELETE", "/api/alerts/" + encodeURIComponent(id))
 		.done(function () {
@@ -354,9 +454,20 @@ function deleteAlert(id) {
 		});
 }
 
-// Search
-function searchArtists() {
-	api("GET", "/api/artists", { search: $("#artistSearch").val() })
+function getAlert(targetType, targetID) {
+	if (!profileData || !profileData.Alerts) return null;
+	for (let i = 0; i < profileData.Alerts.length; i = i + 1) {
+		let alert = profileData.Alerts[i];
+		if (String(alert.TargetType) == String(targetType) && String(alert.TargetID) == String(targetID)) {
+			return alert;
+		}
+	}
+	return null;
+}
+
+// Lists
+function loadArtists() {
+	api("GET", "/api/artists")
 		.done(function (response) {
 			artists = response || [];
 			renderArtists();
@@ -366,8 +477,8 @@ function searchArtists() {
 		});
 }
 
-function searchVenues() {
-	api("GET", "/api/venues", { search: $("#venueSearch").val() })
+function loadVenues() {
+	api("GET", "/api/venues")
 		.done(function (response) {
 			venues = response || [];
 			renderVenues();
@@ -388,6 +499,7 @@ function renderArtists() {
 		`);
 	}
 	$("#artistResults").val(selectedArtistID);
+	renderAlertBlock();
 }
 
 function renderVenues() {
@@ -401,69 +513,159 @@ function renderVenues() {
 		`);
 	}
 	$("#venueResults").val(selectedVenueID);
+	renderAlertBlock();
+	renderCountries();
 }
 
 function selectArtist() {
 	selectedArtistID = $("#artistResults").val();
-	loadConcerts();
+	renderAlertBlock();
+	loadConcerts(true);
 }
 
 function selectVenue() {
 	selectedVenueID = $("#venueResults").val();
-	loadConcerts();
+	renderAlertBlock();
+	loadConcerts(true);
+}
+
+function renderCountries() {
+	let seen = {};
+	let countries = [];
+	for (let i = 0; i < venues.length; i = i + 1) {
+		let country = field(venues[i], ["Country", "country"], "");
+		if (!country || seen[country]) continue;
+		seen[country] = true;
+		countries.push(country);
+	}
+	countries.sort();
+
+	$("#countryResults").html(`<option value="">All countries</option>`);
+	for (let i = 0; i < countries.length; i = i + 1) {
+		let country = countries[i];
+		$("#countryResults").append(`<option value="${escapeHTML(country)}">${escapeHTML(country)}</option>`);
+	}
+	$("#countryResults").val(selectedCountry);
+}
+
+function selectCountry() {
+	selectedCountry = $("#countryResults").val();
+	loadConcerts(true);
+}
+
+function selectStatus() {
+	selectedStatus = $("#statusResults").val() || "future";
+	loadConcerts(true);
 }
 
 function clearSearch() {
 	selectedArtistID = "";
 	selectedVenueID = "";
-	$("#artistSearch").val("");
-	$("#venueSearch").val("");
-	artists = [];
-	venues = [];
+	selectedCountry = "";
+	selectedStatus = "future";
 	renderArtists();
 	renderVenues();
-	loadConcerts();
+	renderCountries();
+	$("#statusResults").val(selectedStatus);
+	renderAlertBlock();
+	loadConcerts(true);
 }
 
-function loadConcerts() {
+function loadConcerts(reset) {
+	if (reset) {
+		concertRequestNonce = concertRequestNonce + 1;
+		concertPage = 1;
+		concertHasMore = true;
+		concerts = [];
+		concertLoading = false;
+		renderConcerts();
+	}
+	if (concertLoading || !concertHasMore) return;
+
+	let requestNonce = concertRequestNonce;
+	let page = concertPage;
 	let params = {};
 	if (selectedArtistID) params.artistID = selectedArtistID;
 	if (selectedVenueID) params.venueID = selectedVenueID;
+	params.country = selectedCountry || "all";
+	params.status = selectedStatus || "future";
+	params.page = page;
+	concertLoading = true;
 
 	api("GET", "/api/concerts", params)
 		.done(function (response) {
-			concerts = response || [];
+			if (requestNonce != concertRequestNonce) return;
+			response = response || [];
+			if (response.length == 0) {
+				concertHasMore = false;
+				return;
+			}
+			concerts = concerts.concat(response);
+			concertPage = page + 1;
 			renderConcerts();
 		})
 		.fail(function (xhr) {
-			$("#concertsList").html(`<tr><td colspan="5">${escapeHTML(errorText(xhr, "Unable to load concerts."))}</td></tr>`);
+			if (requestNonce != concertRequestNonce) return;
+			$("#concertsGrid").html(`<div class="column is-12"><div class="notification is-danger is-light">${escapeHTML(errorText(xhr, "Unable to load concerts."))}</div></div>`);
+		})
+		.always(function () {
+			if (requestNonce == concertRequestNonce) {
+				concertLoading = false;
+			}
 		});
 }
 
 function renderConcerts() {
 	if (concerts.length == 0) {
-		$("#concertsList").html(`<tr><td colspan="5">No concerts.</td></tr>`);
+		$("#concertsGrid").html(`<div class="column is-12"><div class="notification is-light">No concerts.</div></div>`);
 		return;
 	}
 
-	$("#concertsList").html("");
+	$("#concertsGrid").html("");
 	for (let i = 0; i < concerts.length; i = i + 1) {
 		let concert = concerts[i];
 		let id = itemID(concert);
-		$("#concertsList").append(`
-			<tr>
-					<td>${escapeHTML(concert.Name)}</td>
-					<td>${escapeHTML(formatDate(concert.Date))}</td>
-					<td>${escapeHTML(concert.VenueName || "Unknown venue")}</td>
-					<td>${escapeHTML(concert.ArtistName || "Unknown artist")}</td>
-					<td><button class="button is-info is-small" type="button" onclick="openConcert('${escapeHTML(id)}')">Open</button></td>
-				</tr>
-			`);
+		let expired = isExpiredConcert(concert);
+		let tags = renderConcertTags(concert);
+		let photo = concertPhoto(concert);
+		$("#concertsGrid").append(`
+			<div class="column is-half-tablet is-one-third-desktop">
+				<div class="card ticketmet-concert-card ${expired ? "ticketmet-concert-card--expired" : ""}">
+					<div class="card-image">
+						<figure class="image is-16by9">
+							<img src="${escapeHTML(photo)}" alt="${escapeHTML(concert.Name || "Concert")}">
+						</figure>
+					</div>
+					<div class="card-content">
+						<p class="title is-5 mb-2">${escapeHTML(concert.Name)}</p>
+						<p class="subtitle is-6 mb-3">${escapeHTML(concert.ArtistName || "Unknown artist")} · ${escapeHTML(concert.VenueName || "Unknown venue")}</p>
+						<p class="is-size-7 mb-3">${escapeHTML(formatDate(concert.Date))}</p>
+						<div class="tags">${tags}</div>
+					</div>
+					<footer class="card-footer">
+						<button class="card-footer-item button is-white" type="button" onclick="openConcert('${escapeHTML(id)}')">Open</button>
+					</footer>
+				</div>
+			</div>
+		`);
+	}
+}
+
+function loadMoreConcerts() {
+	loadConcerts(false);
+}
+
+function handleConcertScroll() {
+	if (concertLoading || !concertHasMore) return;
+	let scrollBottom = $(window).scrollTop() + $(window).height();
+	let pageBottom = $(document).height() - 200;
+	if (scrollBottom >= pageBottom) {
+		loadMoreConcerts();
 	}
 }
 
 function openConcert(id) {
-	api("GET", "/api/concerts/" + id)
+	return api("GET", "/api/concerts/" + id)
 		.done(function (response) {
 			selectedConcert = response;
 			renderConcert();
@@ -483,28 +685,62 @@ function closeConcert() {
 	showView("searchView");
 }
 
+function shareConcert() {
+	if (!selectedConcert) return;
+
+	let link = new URL(window.location.href);
+	link.search = "";
+	link.searchParams.set("concert", itemID(selectedConcert));
+
+	copyTextToClipboard(link.toString())
+		.then(function () {
+			setMessages("success", "Concert link copied.");
+		})
+		.catch(function () {
+			setMessages("danger", "Unable to copy concert link.");
+		});
+}
+
+function copyTextToClipboard(text) {
+	if (navigator.clipboard && navigator.clipboard.writeText) {
+		return navigator.clipboard.writeText(text);
+	}
+
+	let textarea = $("<textarea>").val(text).css({ position: "fixed", left: "-9999px", top: "0" }).appendTo("body");
+	textarea[0].select();
+	let ok = document.execCommand("copy");
+	textarea.remove();
+	return ok ? Promise.resolve() : Promise.reject(new Error("copy failed"));
+}
+
 function renderConcert() {
 	if (!selectedConcert) {
 		$("#noConcertText").show();
 		$("#concertDetails").hide();
+		$("#concertDetails").removeClass("ticketmet-concert-detail--expired");
+		$("#detailBadges").html("");
+		$("#detailSeatmapLine").hide();
 		return;
 	}
 
 	$("#noConcertText").hide();
 	$("#concertDetails").show();
+	$("#concertDetails").toggleClass("ticketmet-concert-detail--expired", isExpiredConcert(selectedConcert));
 	$("#detailName").text(selectedConcert.Name);
 	$("#detailDate").text(formatDate(selectedConcert.Date));
 	$("#detailSale").text(formatDate(selectedConcert.SaleStartDateTime) || "Not provided");
 	$("#detailVenue").text(selectedConcert.VenueName || "Unknown venue");
 	$("#detailArtist").text(selectedConcert.ArtistName || "Unknown artist");
 	$("#detailURL").attr("href", selectedConcert.URL || "#");
-	$("#detailSeatmap").attr("href", selectedConcert.SeatmapURL || "#");
-
-	let photo = "lib/concert.png";
-	if (selectedConcert.Photos && selectedConcert.Photos.length > 0) {
-		photo = selectedConcert.Photos[0];
+	if (selectedConcert.SeatmapURL) {
+		$("#detailSeatmapLine").show();
+		$("#detailSeatmap").attr("href", selectedConcert.SeatmapURL);
+	} else {
+		$("#detailSeatmapLine").hide();
 	}
-	$("#detailPhoto").attr("src", photo);
+
+	$("#detailPhoto").attr("src", concertPhoto(selectedConcert));
+	$("#detailBadges").html(renderConcertTags(selectedConcert));
 
 	renderConcertActions();
 	loadConcertFeatures();
@@ -559,10 +795,15 @@ function loadConcertFeatures() {
 function renderWT(response) {
 	let wtb = response.WTB || [];
 	let wts = response.WTS || [];
+	let wtbCount = field(response, ["WTBCount", "wtbCount"], wtb.length);
+	let wtsCount = field(response, ["WTSCount", "wtsCount"], wts.length);
+	let expired = selectedConcert ? isExpiredConcert(selectedConcert) : false;
+	let note = expired ? `<p class="has-text-grey mb-2">Past event, trade is disabled.</p>` : "";
 	let html = `
-		<p><strong>WTB:</strong> ${escapeHTML(wtb.length)}</p>
+		${note}
+		<p><strong>WTB:</strong> ${escapeHTML(wtbCount)}</p>
 		<div class="tags mb-2">${tagsHTML(wtb, "No WTB SNS.")}</div>
-		<p><strong>WTS:</strong> ${escapeHTML(wts.length)}</p>
+		<p><strong>WTS:</strong> ${escapeHTML(wtsCount)}</p>
 		<div class="tags">${tagsHTML(wts, "No WTS SNS.")}</div>`;
 	$("#detailWT").html(html);
 }
@@ -628,9 +869,12 @@ function renderConcertActions() {
 	if (!selectedConcert) return;
 
 	let concertID = String(itemID(selectedConcert));
+	let expired = isExpiredConcert(selectedConcert);
 	let favorite = hasFavorite(concertID);
 	$("#favoriteAddButton").css("display", favorite ? "none" : "");
 	$("#favoriteDeleteButton").css("display", favorite ? "" : "none");
+	$("#favoriteAddButton").prop("disabled", expired);
+	$("#favoriteDeleteButton").prop("disabled", false);
 
 	let mineWTB = hasWT(concertID, "wtb");
 	let mineWTS = hasWT(concertID, "wts");
@@ -638,6 +882,47 @@ function renderConcertActions() {
 	$("#wtbDeleteButton").css("display", mineWTB ? "" : "none");
 	$("#wtsAddButton").css("display", mineWTS ? "none" : "");
 	$("#wtsDeleteButton").css("display", mineWTS ? "" : "none");
+	$("#wtbAddButton").prop("disabled", expired);
+	$("#wtbDeleteButton").prop("disabled", expired);
+	$("#wtsAddButton").prop("disabled", expired);
+	$("#wtsDeleteButton").prop("disabled", expired);
+}
+
+function isExpiredConcert(concert) {
+	if (!concert) return false;
+	let value = field(concert, ["Date", "date"], "");
+	if (!value) return false;
+	let date = new Date(value);
+	if (Number.isNaN(date.getTime())) return false;
+	return date.getTime() < Date.now();
+}
+
+function concertPhoto(concert) {
+	if (concert && concert.Photos && concert.Photos.length > 0 && concert.Photos[0]) {
+		return concert.Photos[0];
+	}
+	return "lib/concert.png";
+}
+
+function renderConcertTags(concert) {
+	let html = "";
+	if (isExpiredConcert(concert)) {
+		html += `<span class="tag is-dark is-light">Past event</span>`;
+	} else {
+		html += `<span class="tag is-success is-light">Upcoming</span>`;
+	}
+
+	let sale = field(concert, ["SaleStartDateTime", "saleStartDateTime"], "");
+	if (sale) {
+		let saleDate = new Date(sale);
+		if (!Number.isNaN(saleDate.getTime()) && saleDate.getTime() > Date.now()) {
+			html += `<span class="tag is-info is-light">Sale soon</span>`;
+		} else if (!Number.isNaN(saleDate.getTime())) {
+			html += `<span class="tag is-warning is-light">Sale open</span>`;
+		}
+	}
+
+	return html;
 }
 
 function hasFavorite(concertID) {
@@ -706,6 +991,7 @@ function registerPasskey() {
 		return;
 	}
 
+	setPasskeyLoading("#registerPasskeyButton", true);
 	api("POST", "/api/auth/passkeys/register/begin")
 		.done(function (options) {
 			let publicKey = options.publicKey;
@@ -728,14 +1014,17 @@ function registerPasskey() {
 					});
 				})
 				.then(function () {
+					setPasskeyLoading("#registerPasskeyButton", false);
 					loadPasskeys();
 					setMessages("success", "Passkey added.");
 				})
 				.catch(function (error) {
+					setPasskeyLoading("#registerPasskeyButton", false);
 					setMessages("danger", "Passkey creation failed: " + passkeyError(error));
 				});
 		})
 		.fail(function (xhr) {
+			setPasskeyLoading("#registerPasskeyButton", false);
 			setMessages("danger", errorText(xhr, "Unable to start passkey creation."));
 		});
 }
@@ -746,6 +1035,7 @@ function loginPasskey() {
 		return;
 	}
 
+	setPasskeyLoading("#loginPasskeyButton", true);
 	api("POST", "/api/auth/passkeys/login/begin")
 		.done(function (options) {
 			let publicKey = options.publicKey;
@@ -767,17 +1057,24 @@ function loginPasskey() {
 					});
 					})
 					.then(function (response) {
+						setPasskeyLoading("#loginPasskeyButton", false);
 						user = response.User;
 						toggleConnected(true);
 						setMessages("success", "Signed in with passkey.");
 				})
 				.catch(function (error) {
+					setPasskeyLoading("#loginPasskeyButton", false);
 					setMessages("danger", "Passkey sign in failed: " + passkeyError(error));
 				});
 		})
 		.fail(function (xhr) {
+			setPasskeyLoading("#loginPasskeyButton", false);
 			setMessages("danger", errorText(xhr, "Unable to start passkey sign in."));
 		});
+}
+
+function setPasskeyLoading(buttonID, loading) {
+	$(buttonID).toggleClass("is-loading", loading);
 }
 
 function credentialToJSON(credential) {

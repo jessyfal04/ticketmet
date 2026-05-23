@@ -17,11 +17,8 @@
 				<div class="level-left">
 					<div>
 						<p class="title is-4">TicketMet</p>
-						<p class="subtitle is-6">Concerts and account security</p>
+						<p class="subtitle is-6">Concerts</p>
 					</div>
-				</div>
-				<div class="level-right">
-					<span id="healthStatus" class="tag is-warning">API status</span>
 				</div>
 			</div>
 		</div>
@@ -35,8 +32,6 @@
 	</div>
 
 	<div class="box mx-5">
-		<h2 class="title is-3">TicketMet</h2>
-
 		<div class="buttons" id="viewButtons">
 			<button class="button is-link is-outlined" id="button-accountView" type="button" onclick="showView('accountView')">Account</button>
 			<button class="button is-link is-outlined" id="button-searchView" type="button" onclick="showView('searchView')">Search</button>
@@ -45,63 +40,72 @@
 
 		<div id="views">
 			<div id="searchView">
-				<div class="columns">
-					<div class="column">
-						<label class="label" for="artistSearch">Artist</label>
-						<div class="field has-addons">
-							<div class="control is-expanded">
-								<input class="input" type="text" id="artistSearch" placeholder="NMIXX">
-							</div>
-							<div class="control">
-								<button class="button is-info" type="button" onclick="searchArtists()">Search</button>
+				<div class="box">
+					<div class="level mb-4">
+						<div class="level-left">
+							<div>
+								<h3 class="title is-4 mb-1">Concert search</h3>
+								<p class="subtitle is-6 mb-0">Filter by artist, venue, country, and time window.</p>
 							</div>
 						</div>
-						<div class="select is-fullwidth">
-							<select id="artistResults" onchange="selectArtist()">
-								<option value="">All artists</option>
-							</select>
+						<div class="level-right">
+							<div class="buttons">
+								<button class="button is-warning is-light" type="button" onclick="clearSearch()">Clear</button>
+							</div>
 						</div>
-						<button class="button is-small is-link is-light mt-2 if-login" style="display:none;" type="button" onclick="createAlertFromSelection('artist')">Alert this artist</button>
 					</div>
 
-					<div class="column">
-						<label class="label" for="venueSearch">Venue</label>
-						<div class="field has-addons">
-							<div class="control is-expanded">
-								<input class="input" type="text" id="venueSearch" placeholder="Accor">
-							</div>
-							<div class="control">
-								<button class="button is-info" type="button" onclick="searchVenues()">Search</button>
+					<div class="columns is-variable is-4 is-multiline">
+						<div class="column">
+							<label class="label" for="artistResults">Artist</label>
+							<div class="select is-fullwidth">
+								<select id="artistResults" onchange="selectArtist()">
+									<option value="">All artists</option>
+								</select>
 							</div>
 						</div>
-						<div class="select is-fullwidth">
-							<select id="venueResults" onchange="selectVenue()">
-								<option value="">All venues</option>
-							</select>
+
+						<div class="column">
+							<label class="label" for="venueResults">Venue</label>
+							<div class="select is-fullwidth">
+								<select id="venueResults" onchange="selectVenue()">
+									<option value="">All venues</option>
+								</select>
+							</div>
 						</div>
-						<button class="button is-small is-link is-light mt-2 if-login" style="display:none;" type="button" onclick="createAlertFromSelection('venue')">Alert this venue</button>
+
+						<div class="column">
+							<label class="label" for="countryResults">Country</label>
+							<div class="select is-fullwidth">
+								<select id="countryResults" onchange="selectCountry()">
+									<option value="">All countries</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="column">
+							<label class="label" for="statusResults">Time</label>
+							<div class="select is-fullwidth">
+								<select id="statusResults" onchange="selectStatus()">
+									<option value="future">Future</option>
+									<option value="all">All</option>
+								</select>
+							</div>
+						</div>
 					</div>
+
+					<div class="level mb-3">
+						<div class="level-left">
+							<div>
+								<h3 class="title is-5 mb-1">Alerts</h3>
+								<p class="subtitle is-6 mb-0">Create an alert from the current search filters.</p>
+							</div>
+						</div>
+					</div>
+					<div id="alertBlock"></div>
 				</div>
 
-				<div class="buttons">
-					<button class="button is-success" type="button" onclick="loadConcerts()">Apply filters</button>
-					<button class="button is-warning is-light" type="button" onclick="clearSearch()">Clear</button>
-				</div>
-
-				<div class="table-container">
-					<table class="table is-hoverable is-fullwidth">
-						<thead>
-							<tr>
-								<th>Concert</th>
-								<th>Date</th>
-								<th>Venue</th>
-								<th>Artist</th>
-								<th>Action</th>
-							</tr>
-						</thead>
-						<tbody id="concertsList"></tbody>
-					</table>
-				</div>
+				<div id="concertsGrid" class="columns is-multiline"></div>
 			</div>
 
 			<div id="accountView" style="display:none;">
@@ -124,7 +128,7 @@
 					<div class="buttons">
 						<button class="button is-link" type="button" id="loginButton" onclick="login()">Sign in</button>
 						<button class="button is-link is-outlined" type="button" id="registerButton" onclick="register()">Register</button>
-						<button class="button is-info is-light" type="button" onclick="loginPasskey()">Sign in with passkey</button>
+						<button class="button is-info is-light" id="loginPasskeyButton" type="button" onclick="loginPasskey()">Sign in with passkey</button>
 					</div>
 				</div>
 
@@ -136,11 +140,10 @@
 							<p><strong>Email:</strong> <span id="accountEmail"></span></p>
 
 							<label class="label mt-4" for="profileSNS">SNS</label>
-							<textarea class="textarea" id="profileSNS" rows="3" placeholder="twitter @jessyfal04"></textarea>
-							<p class="help">One handle or link per line.</p>
+							<textarea class="textarea is-success" id="profileSNS" rows="3" placeholder="twitter @jessyfal04" oninput="profileSNSInput()"></textarea>
+							<p class="help">One handle or link per line. Saved automatically.</p>
 
 							<div class="buttons mt-4">
-								<button class="button is-link" type="button" onclick="saveSNS()">Save SNS</button>
 								<button class="button is-warning is-light" type="button" onclick="logout()">Sign out</button>
 							</div>
 						</div>
@@ -148,7 +151,7 @@
 							<h3 class="title is-5">Passkeys</h3>
 							<div class="buttons">
 								<button class="button is-info is-light" type="button" onclick="loadPasskeys()">Refresh</button>
-								<button class="button is-success" type="button" onclick="registerPasskey()">Add passkey</button>
+								<button class="button is-success" id="registerPasskeyButton" type="button" onclick="registerPasskey()">Add passkey</button>
 							</div>
 							<div id="passkeysList" class="tags are-medium"></div>
 						</div>
@@ -196,9 +199,14 @@
 							<h3 class="title is-3 mb-0" id="detailName"></h3>
 						</div>
 						<div class="level-right">
-							<button class="button is-light" type="button" onclick="closeConcert()">Back to search</button>
+							<div class="buttons">
+								<button class="button is-light" type="button" onclick="closeConcert()">Back to search</button>
+								<button class="button is-info is-light" type="button" onclick="shareConcert()">Share</button>
+							</div>
 						</div>
 					</div>
+
+					<div id="detailBadges" class="tags mb-4"></div>
 
 					<div class="columns">
 						<div class="column is-two-thirds">
@@ -207,7 +215,7 @@
 							<p><strong>Venue:</strong> <span id="detailVenue"></span></p>
 							<p><strong>Artist:</strong> <span id="detailArtist"></span></p>
 							<p><a id="detailURL" href="#" target="_blank" rel="noreferrer">Ticketmaster page</a></p>
-							<p><a id="detailSeatmap" href="#" target="_blank" rel="noreferrer">Seat map</a></p>
+							<p id="detailSeatmapLine"><a id="detailSeatmap" href="#" target="_blank" rel="noreferrer">Seat map</a></p>
 
 							<div class="buttons mt-4 if-login" style="display:none;">
 								<button id="favoriteAddButton" class="button is-success" type="button" onclick="addFavorite()">Add favorite</button>
@@ -216,8 +224,6 @@
 								<button id="wtbDeleteButton" class="button is-link" type="button" onclick="deleteWT('wtb')">Remove WTB</button>
 								<button id="wtsAddButton" class="button is-info is-light" type="button" onclick="addWT('wts')">WTS</button>
 								<button id="wtsDeleteButton" class="button is-info" type="button" onclick="deleteWT('wts')">Remove WTS</button>
-								<button class="button is-small is-link is-light" type="button" onclick="createAlertForSelected('artist')">Alert artist</button>
-								<button class="button is-small is-link is-light" type="button" onclick="createAlertForSelected('venue')">Alert venue</button>
 							</div>
 						</div>
 						<div class="column">
