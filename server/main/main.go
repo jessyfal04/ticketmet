@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"server/api"
@@ -20,43 +21,53 @@ import (
 //go:embed schema.sql
 var schemaSQL string // Put the content of schema.sql in the string
 
+const (
+	ticketmasterInterval = 15 * time.Minute
+	alertRadarInterval   = time.Minute
+)
+
 func main() {
 	// Log file
-	logFile, err := configureLog(getenv("LOG_PATH", "data/ticketmet.log"))
+	logFile, err := configureLog(job.Getenv("LOG_PATH", "data/ticketmet.log"))
 	if err != nil {
 		log.Fatalf("Log error: %v", err)
 	}
 	defer logFile.Close()
 
 	// Database
-	db, err := openDB(getenv("DB_PATH", "data/ticketmet.sqlite3"))
+	db, err := openDB(job.Getenv("DB_PATH", "data/ticketmet.sqlite3"))
 	if err != nil {
 		log.Fatalf("DB error: %v", err)
 	}
 	defer db.Close()
 
-	dbServer := job.NewDBServer(db)
-	go dbServer.Run(context.Background())
+	// Start DB server
+	dbChan := make(chan job.DBRequest, 64)
+	job.RunDBServer(context.Background(), db, dbChan)
 
 	// Start Ticketmaster sync
-	go job.RunTicketmaster(context.Background(), dbServer.C, getenv("TICKETMASTER_API_KEY", ""), 15*time.Minute)
+	go job.RunTicketmaster(context.Background(), dbChan, job.Getenv("TICKETMASTER_API_KEY", ""), ticketmasterInterval)
 
 	// Start mailserver
-	mailServer := job.NewFromEnv()
-	go mailServer.Run(context.Background())
+	mailChan := make(chan job.Envelope, 64)
+	job.RunMailServer(context.Background(), job.Config{
+		Host: job.Getenv("SMTP_HOST", "10.66.66.1"),
+		Port: job.GetenvInt("SMTP_PORT", 25),
+		From: job.Getenv("SMTP_FROM", "ticketmet@jessyfal04.dev"),
+	}, mailChan)
 
 	// Start alert radar
-	go job.RunAlertRadar(context.Background(), dbServer.C, mailServer.C, time.Minute)
+	go job.RunAlertRadar(context.Background(), dbChan, mailChan, alertRadarInterval)
 
 	// Start Setlist.fm
-	setlistServer := job.NewSetlistFMServer(dbServer.C, getenv("SETLISTFM_API_KEY", ""))
-	go setlistServer.Run(context.Background())
+	setlistChan := make(chan job.SetlistRequest, 32)
+	job.RunSetlistFMServer(context.Background(), dbChan, strings.TrimSpace(job.Getenv("SETLISTFM_API_KEY", "")), setlistChan)
 
 	// Start HTTP server
-	clientDir := getenv("CLIENT_DIR", "../client")
-	mux := api.ServeMux(clientDir, dbServer.C, mailServer.C, setlistServer.C)
+	clientDir := job.Getenv("CLIENT_DIR", "../client")
+	mux := api.ServeMux(clientDir, dbChan, mailChan, setlistChan)
 
-	addr := ":" + getenv("PORT", "8080")
+	addr := ":" + job.Getenv("PORT", "8080")
 	log.Printf("Listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("Server error: %v", err)
@@ -99,10 +110,3 @@ func openDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func getenv(key, fallback string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
-	}
-	return value
-}

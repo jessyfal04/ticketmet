@@ -26,35 +26,19 @@ type DBServer struct {
 	C  chan DBRequest
 }
 
-// Create a DBServer
-func NewDBServer(db *sql.DB) *DBServer {
-	return &DBServer{
-		DB: db,
-		C:  make(chan DBRequest, 64),
-	}
+func RunDBServer(ctx context.Context, db *sql.DB, c chan DBRequest) {
+	go (&DBServer{DB: db, C: c}).Run(ctx)
 }
 
 // Run the DBServer
 func (s *DBServer) Run(ctx context.Context) {
-	for {
+	runChan(ctx, s.C, func(req DBRequest) {
+		value, err := req.Fn(req.Ctx, s.DB)
 		select {
-			// done
-			case <-ctx.Done():
-				return
-			
-			// request
-			case req := <-s.C:
-				value, err := req.Fn(req.Ctx, s.DB)
-				select {
-					// result
-					case req.Ret <- DBResult{Value: value, Err: err}:
-					
-					// done
-					case <-ctx.Done():
-						return
-					}
+		case req.Ret <- DBResult{Value: value, Err: err}:
+		case <-ctx.Done():
 		}
-	}
+	})
 }
 
 // ScanFunc is a function that scans a SQL row into a type T.

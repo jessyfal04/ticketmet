@@ -180,10 +180,8 @@ Setlist potentielle / par artiste (via attractions name)
   - `SMTP_HOST` : serveur SMTP, par exemple `10.66.66.1` depuis Docker/VPN
   - `SMTP_PORT` : port SMTP, par défaut `25`
   - `SMTP_FROM` : expéditeur, par défaut `ticketmet@jessyfal04.dev`
-  - `SMTP_USER` / `SMTP_PASSWORD` : optionnels, si le serveur demande une auth
-  - `SMTP_TLS=starttls` : optionnel, seulement si on veut explicitement STARTTLS
-  - `APP_BASE_URL` : URL utilisée dans les boutons de mail, par défaut `https://ticketmet.jessyfal04.dev`
-- Le template HTML centralise une zone dédiée au contenu du mail, une carte indiquant l'adresse du compte et un bouton d'action.
+  - `APP_BASE_URL` : base URL used in mail buttons and `?concert=` redirections, default `https://ticketmet.jessyfal04.dev`
+- The HTML template keeps a simple content area, an account card, and an action button.
 
 ## Flux du Système
 - client -> serveur : requêtes HTTP
