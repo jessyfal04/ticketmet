@@ -14,6 +14,7 @@ let concertPage = 1;
 let concertHasMore = true;
 let concertLoading = false;
 let concertRequestNonce = 0;
+let countryNames = { US: "United States Of America", AD: "Andorra", AI: "Anguilla", AR: "Argentina", AU: "Australia", AT: "Austria", AZ: "Azerbaijan", BS: "Bahamas", BH: "Bahrain", BB: "Barbados", BE: "Belgium", BM: "Bermuda", BR: "Brazil", BG: "Bulgaria", CA: "Canada", CL: "Chile", CN: "China", CO: "Colombia", CR: "Costa Rica", HR: "Croatia", CY: "Cyprus", CZ: "Czech Republic", DK: "Denmark", DO: "Dominican Republic", EC: "Ecuador", EE: "Estonia", FO: "Faroe Islands", FI: "Finland", FR: "France", GE: "Georgia", DE: "Germany", GH: "Ghana", GI: "Gibraltar", GB: "Great Britain", GR: "Greece", HK: "Hong Kong", HU: "Hungary", IS: "Iceland", IN: "India", IE: "Ireland", IL: "Israel", IT: "Italy", JM: "Jamaica", JP: "Japan", KR: "Korea, Republic of", LV: "Latvia", LB: "Lebanon", LT: "Lithuania", LU: "Luxembourg", MY: "Malaysia", MT: "Malta", MX: "Mexico", MC: "Monaco", ME: "Montenegro", MA: "Morocco", NL: "Netherlands", AN: "Netherlands Antilles", NZ: "New Zealand", ND: "Northern Ireland", NO: "Norway", PE: "Peru", PL: "Poland", PT: "Portugal", RO: "Romania", RU: "Russian Federation", LC: "Saint Lucia", SA: "Saudi Arabia", RS: "Serbia", SG: "Singapore", SK: "Slovakia", SI: "Slovenia", ZA: "South Africa", ES: "Spain", SE: "Sweden", CH: "Switzerland", TW: "Taiwan", TH: "Thailand", TT: "Trinidad and Tobago", TR: "Turkey", UA: "Ukraine", AE: "United Arab Emirates", UY: "Uruguay", VE: "Venezuela" };
 
 $(function () {
 	showView("searchView");
@@ -191,6 +192,7 @@ function unregisterAccount() {
 			setMessages("success", "Account deleted.");
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Account deletion failed."));
 		});
 }
@@ -228,6 +230,20 @@ function toggleConnected(connected) {
 	}
 }
 
+function handleAuthRequired(xhr) {
+	if (!xhr || (xhr.status != 401 && xhr.status != 403)) {
+		return false;
+	}
+
+	let wasConnected = !!user;
+	user = null;
+	toggleConnected(false);
+	if (wasConnected) {
+		setMessages("warning", "Disconnected.");
+	}
+	return true;
+}
+
 function renderAccount() {
 	if (!user) {
 		$("#accountID").text("");
@@ -260,6 +276,7 @@ function loadProfile() {
 			renderConcertActions();
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Unable to load profile."));
 		});
 }
@@ -284,6 +301,7 @@ function saveSNS() {
 			setMessages("success", "SNS saved.");
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			$("#profileSNS").removeClass("is-success");
 			$("#profileSNS").addClass("is-danger");
 			setMessages("danger", errorText(xhr, "Unable to save SNS."));
@@ -337,8 +355,8 @@ function renderAlertBlock() {
 			<p><strong>Venue:</strong> ${escapeHTML(venue)}</p>
 		</div>
 		<div class="buttons">
-			<button class="button ${artistAlert ? "is-warning" : "is-link"} is-light" type="button" ${selectedArtistID ? "" : "disabled"} onclick="createAlertFromSelection('artist')">${artistAlert ? "Remove artist alert" : "Alert this artist"}</button>
-			<button class="button ${venueAlert ? "is-warning" : "is-link"} is-light" type="button" ${selectedVenueID ? "" : "disabled"} onclick="createAlertFromSelection('venue')">${venueAlert ? "Remove venue alert" : "Alert this venue"}</button>
+			<button class="button ${artistAlert ? "is-primary is-light" : "is-primary"}" type="button" ${selectedArtistID ? "" : "disabled"} onclick="createAlertFromSelection('artist')">${artistAlert ? "Remove artist alert" : "Alert this artist"}</button>
+			<button class="button ${venueAlert ? "is-primary is-light" : "is-primary"}" type="button" ${selectedVenueID ? "" : "disabled"} onclick="createAlertFromSelection('venue')">${venueAlert ? "Remove venue alert" : "Alert this venue"}</button>
 		</div>
 	`);
 }
@@ -358,12 +376,15 @@ function renderProfileConcertList(target, items, emptyText) {
 		return;
 	}
 
-	let html = "<ul>";
+	let html = "";
 	for (let i = 0; i < items.length; i = i + 1) {
 		let concert = items[i];
-		html += `<li><button class="button is-small is-ghost p-0" type="button" onclick="openConcert('${escapeHTML(itemID(concert))}')">${escapeHTML(concert.Name)}</button></li>`;
+		html += `
+			<div class="tags has-addons mb-1">
+				<span class="tag is-primary is-light">Favorite</span>
+				<button class="tag is-light" type="button" onclick="openConcert('${escapeHTML(itemID(concert))}')">${escapeHTML(concert.Name)}</button>
+			</div>`;
 	}
-	html += "</ul>";
 	$(target).html(html);
 }
 
@@ -373,13 +394,16 @@ function renderProfileWTList(items) {
 		return;
 	}
 
-	let html = "<ul>";
+	let html = "";
 	for (let i = 0; i < items.length; i = i + 1) {
 		let item = items[i];
 		let concert = item.Concert || {};
-		html += `<li><span class="tag is-light">${escapeHTML(String(item.Type).toUpperCase())}</span> <button class="button is-small is-ghost p-0" type="button" onclick="openConcert('${escapeHTML(itemID(concert))}')">${escapeHTML(concert.Name)}</button></li>`;
+		html += `
+			<div class="tags has-addons mb-1">
+				<span class="tag is-primary is-light">${escapeHTML(String(item.Type).toUpperCase())}</span>
+				<button class="tag is-light" type="button" onclick="openConcert('${escapeHTML(itemID(concert))}')">${escapeHTML(concert.Name)}</button>
+			</div>`;
 	}
-	html += "</ul>";
 	$("#profileWT").html(html);
 }
 
@@ -392,9 +416,11 @@ function renderProfileAlerts(items) {
 	let html = "";
 	for (let i = 0; i < items.length; i = i + 1) {
 		let alert = items[i];
+		let type = String(alert.TargetType || "target");
+		type = type.charAt(0).toUpperCase() + type.slice(1);
 		html += `
 			<div class="tags has-addons mb-1">
-				<span class="tag is-info is-light">${escapeHTML(alert.TargetType)} #${escapeHTML(alert.TargetID)}</span>
+				<span class="tag is-info is-light">${escapeHTML(type)}</span>
 				<span class="tag">${escapeHTML(alert.TargetName || "target")}</span>
 				<a class="tag is-delete" onclick="deleteAlert('${escapeHTML(alert.ID)}')"></a>
 			</div>`;
@@ -430,6 +456,7 @@ function createAlert(targetType, targetID) {
 			setMessages("success", "Alert created.");
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Unable to create alert."));
 		});
 }
@@ -450,6 +477,7 @@ function deleteAlert(id) {
 			setMessages("success", "Alert deleted.");
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Unable to delete alert."));
 		});
 }
@@ -538,12 +566,16 @@ function renderCountries() {
 		seen[country] = true;
 		countries.push(country);
 	}
-	countries.sort();
+	countries.sort(function (left, right) {
+		let leftName = countryNames[left] || left;
+		let rightName = countryNames[right] || right;
+		return leftName.localeCompare(rightName);
+	});
 
 	$("#countryResults").html(`<option value="">All countries</option>`);
 	for (let i = 0; i < countries.length; i = i + 1) {
 		let country = countries[i];
-		$("#countryResults").append(`<option value="${escapeHTML(country)}">${escapeHTML(country)}</option>`);
+		$("#countryResults").append(`<option value="${escapeHTML(country)}">${escapeHTML(countryNames[country])}</option>`);
 	}
 	$("#countryResults").val(selectedCountry);
 }
@@ -694,7 +726,7 @@ function shareConcert() {
 
 	copyTextToClipboard(link.toString())
 		.then(function () {
-			setMessages("success", "Concert link copied.");
+			setMessages("info", "Concert link copied.");
 		})
 		.catch(function () {
 			setMessages("danger", "Unable to copy concert link.");
@@ -718,8 +750,9 @@ function renderConcert() {
 		$("#noConcertText").show();
 		$("#concertDetails").hide();
 		$("#concertDetails").removeClass("ticketmet-concert-detail--expired");
-		$("#detailBadges").html("");
-		$("#detailSeatmapLine").hide();
+		$("#detailDateStatus").html("");
+		$("#detailSaleStatus").html("");
+		$("#detailSeatmap").hide();
 		return;
 	}
 
@@ -732,15 +765,26 @@ function renderConcert() {
 	$("#detailVenue").text(selectedConcert.VenueName || "Unknown venue");
 	$("#detailArtist").text(selectedConcert.ArtistName || "Unknown artist");
 	$("#detailURL").attr("href", selectedConcert.URL || "#");
+	$("#detailDateStatus").html(isExpiredConcert(selectedConcert)
+		? `<span class="tag is-dark is-light">Past event</span>`
+		: `<span class="tag is-success is-light">Upcoming</span>`);
+	$("#detailSaleStatus").html("");
+	let sale = field(selectedConcert, ["SaleStartDateTime", "saleStartDateTime"], "");
+	if (sale) {
+		let saleDate = new Date(sale);
+		if (!Number.isNaN(saleDate.getTime()) && saleDate.getTime() > Date.now()) {
+			$("#detailSaleStatus").html(`<span class="tag is-info is-light">Sale soon</span>`);
+		} else if (!Number.isNaN(saleDate.getTime())) {
+			$("#detailSaleStatus").html(`<span class="tag is-warning is-light">Sale open</span>`);
+		}
+	}
 	if (selectedConcert.SeatmapURL) {
-		$("#detailSeatmapLine").show();
-		$("#detailSeatmap").attr("href", selectedConcert.SeatmapURL);
+		$("#detailSeatmap").show().attr("href", selectedConcert.SeatmapURL);
 	} else {
-		$("#detailSeatmapLine").hide();
+		$("#detailSeatmap").hide();
 	}
 
 	$("#detailPhoto").attr("src", concertPhoto(selectedConcert));
-	$("#detailBadges").html(renderConcertTags(selectedConcert));
 
 	renderConcertActions();
 	loadConcertFeatures();
@@ -779,6 +823,7 @@ function loadConcertFeatures() {
 			renderTags("#detailSNS", response.SNS || [], "No SNS yet.");
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			$("#detailSNS").html(escapeHTML(errorText(xhr, "Unable to load SNS.")));
 		});
 
@@ -788,6 +833,7 @@ function loadConcertFeatures() {
 			renderConcertActions();
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			$("#detailWT").html(escapeHTML(errorText(xhr, "Unable to load WTB/WTS.")));
 		});
 }
@@ -840,6 +886,7 @@ function setFavorite(method, message) {
 			setMessages("success", message);
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Favorite update failed."));
 		});
 }
@@ -861,6 +908,7 @@ function setWT(method, type, message) {
 			setMessages("success", message);
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "WTB/WTS update failed."));
 		});
 }
@@ -970,6 +1018,7 @@ function loadPasskeys() {
 			}
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Unable to list passkeys."));
 		});
 }
@@ -981,6 +1030,7 @@ function deletePasskey(id) {
 			setMessages("success", "Passkey deleted.");
 		})
 		.fail(function (xhr) {
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Passkey deletion failed."));
 		});
 }
@@ -1009,6 +1059,9 @@ function registerPasskey() {
 						api("POST", "/api/auth/passkeys/register/finish", credentialToJSON(credential))
 							.done(resolve)
 							.fail(function (xhr) {
+								if (handleAuthRequired(xhr)) {
+									reject(xhr); return;
+								}
 								reject(new Error(errorText(xhr, "server validation refused")));
 							});
 					});
@@ -1020,11 +1073,13 @@ function registerPasskey() {
 				})
 				.catch(function (error) {
 					setPasskeyLoading("#registerPasskeyButton", false);
+					if (handleAuthRequired(error)) return;
 					setMessages("danger", "Passkey creation failed: " + passkeyError(error));
 				});
 		})
 		.fail(function (xhr) {
 			setPasskeyLoading("#registerPasskeyButton", false);
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Unable to start passkey creation."));
 		});
 }
@@ -1052,6 +1107,9 @@ function loginPasskey() {
 						api("POST", "/api/auth/passkeys/login/finish", credentialToJSON(credential))
 							.done(resolve)
 							.fail(function (xhr) {
+								if (handleAuthRequired(xhr)) {
+									reject(xhr); return;
+								}
 								reject(new Error(errorText(xhr, "server validation refused")));
 							});
 					});
@@ -1064,11 +1122,13 @@ function loginPasskey() {
 				})
 				.catch(function (error) {
 					setPasskeyLoading("#loginPasskeyButton", false);
+					if (handleAuthRequired(error)) return;
 					setMessages("danger", "Passkey sign in failed: " + passkeyError(error));
 				});
 		})
 		.fail(function (xhr) {
 			setPasskeyLoading("#loginPasskeyButton", false);
+			if (handleAuthRequired(xhr)) return;
 			setMessages("danger", errorText(xhr, "Unable to start passkey sign in."));
 		});
 }

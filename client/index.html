@@ -50,7 +50,7 @@
 						</div>
 						<div class="level-right">
 							<div class="buttons">
-								<button class="button is-warning is-light" type="button" onclick="clearSearch()">Clear</button>
+								<button class="button is-warning" type="button" onclick="clearSearch()">Clear</button>
 							</div>
 						</div>
 					</div>
@@ -110,83 +110,86 @@
 
 			<div id="accountView" style="display:none;">
 				<div class="if-not-login">
-					<h3 class="title is-4">Sign in</h3>
+					<div class="box">
+						<h3 class="title is-4">Sign in</h3>
 
-					<div class="columns">
-						<div class="column">
-							<label class="label" for="email">Email</label>
-							<input class="input" type="email" id="email" placeholder="alice@example.com" onchange="emailExists()">
-							<p class="help" id="emailHelp">Use a valid email address.</p>
+						<div class="columns">
+							<div class="column">
+								<label class="label" for="email">Email</label>
+								<input class="input" type="email" id="email" placeholder="alice@example.com" onchange="emailExists()">
+								<p class="help" id="emailHelp">Use a valid email address.</p>
+							</div>
+							<div class="column">
+								<label class="label" for="password">Password</label>
+								<input class="input" type="password" id="password" minlength="8" placeholder="********">
+								<p class="help">Minimum 8 characters.</p>
+							</div>
 						</div>
-						<div class="column">
-							<label class="label" for="password">Password</label>
-							<input class="input" type="password" id="password" minlength="8" placeholder="********">
-							<p class="help">Minimum 8 characters.</p>
-						</div>
-					</div>
 
-					<div class="buttons">
-						<button class="button is-link" type="button" id="loginButton" onclick="login()">Sign in</button>
-						<button class="button is-link is-outlined" type="button" id="registerButton" onclick="register()">Register</button>
-						<button class="button is-info is-light" id="loginPasskeyButton" type="button" onclick="loginPasskey()">Sign in with passkey</button>
+						<div class="buttons">
+							<button class="button is-link" type="button" id="loginButton" onclick="login()">Sign in</button>
+							<button class="button is-link is-outlined" type="button" id="registerButton" onclick="register()">Register</button>
+							<button class="button is-info is-light" id="loginPasskeyButton" type="button" onclick="loginPasskey()">Sign in with passkey</button>
+						</div>
 					</div>
 				</div>
 
 				<div class="if-login" style="display:none;">
-					<div class="columns">
-						<div class="column">
-							<h3 class="title is-5">Profile</h3>
-							<p><strong>ID:</strong> <span id="accountID"></span></p>
-							<p><strong>Email:</strong> <span id="accountEmail"></span></p>
+					<div class="box">
+						<div class="columns">
+							<div class="column">
+								<h3 class="title is-5">Profile</h3>
+								<p><strong>ID:</strong> <span id="accountID"></span></p>
+								<p><strong>Email:</strong> <span id="accountEmail"></span></p>
 
-							<label class="label mt-4" for="profileSNS">SNS</label>
-							<textarea class="textarea is-success" id="profileSNS" rows="3" placeholder="twitter @jessyfal04" oninput="profileSNSInput()"></textarea>
-							<p class="help">One handle or link per line. Saved automatically.</p>
+								<label class="label mt-4" for="profileSNS">SNS</label>
+								<textarea class="textarea is-success" id="profileSNS" rows="3" placeholder="twitter @jessyfal04" oninput="profileSNSInput()"></textarea>
+								<p class="help">Saved automatically.</p>
 
-							<div class="buttons mt-4">
-								<button class="button is-warning is-light" type="button" onclick="logout()">Sign out</button>
+								<div class="buttons mt-4">
+									<button class="button is-warning" type="button" onclick="logout()">Sign out</button>
+								</div>
+							</div>
+							<div class="column">
+								<h3 class="title is-5">Passkeys</h3>
+								<div class="buttons">
+									<button class="button is-success is-light" type="button" onclick="loadPasskeys()">Refresh</button>
+									<button class="button is-success" id="registerPasskeyButton" type="button" onclick="registerPasskey()">Add passkey</button>
+								</div>
+								<div id="passkeysList" class="tags are-medium"></div>
 							</div>
 						</div>
-						<div class="column">
-							<h3 class="title is-5">Passkeys</h3>
-							<div class="buttons">
-								<button class="button is-info is-light" type="button" onclick="loadPasskeys()">Refresh</button>
-								<button class="button is-success" id="registerPasskeyButton" type="button" onclick="registerPasskey()">Add passkey</button>
+					</div>
+
+					<div class="box">
+						<h3 class="title is-5">My activity</h3>
+						<div class="columns">
+							<div class="column">
+								<h4 class="title is-6">Favorites</h4>
+								<div id="profileFavorites" class="content is-small"></div>
 							</div>
-							<div id="passkeysList" class="tags are-medium"></div>
+							<div class="column">
+								<h4 class="title is-6">WTB / WTS</h4>
+								<div id="profileWT" class="content is-small"></div>
+							</div>
+							<div class="column">
+								<h4 class="title is-6">Alerts</h4>
+								<div id="profileAlerts" class="content is-small"></div>
+							</div>
 						</div>
 					</div>
 
-					<hr>
-
-					<h3 class="title is-5">My activity</h3>
-					<div class="columns">
-						<div class="column">
-							<h4 class="title is-6">Favorites</h4>
-							<div id="profileFavorites" class="content is-small"></div>
-						</div>
-						<div class="column">
-							<h4 class="title is-6">WTB / WTS</h4>
-							<div id="profileWT" class="content is-small"></div>
-						</div>
-						<div class="column">
-							<h4 class="title is-6">Alerts</h4>
-							<div id="profileAlerts" class="content is-small"></div>
+					<div class="box">
+						<h3 class="title is-5">Danger zone</h3>
+						<div class="field has-addons">
+							<div class="control is-expanded">
+								<input class="input" type="password" id="unregisterPassword" placeholder="Current password">
+							</div>
+							<div class="control">
+								<button class="button is-danger" type="button" onclick="unregisterAccount()">Delete account</button>
+							</div>
 						</div>
 					</div>
-
-					<hr>
-
-					<h3 class="title is-5">Danger zone</h3>
-					<div class="field has-addons">
-						<div class="control is-expanded">
-							<input class="input" type="password" id="unregisterPassword" placeholder="Current password">
-						</div>
-						<div class="control">
-							<button class="button is-danger" type="button" onclick="unregisterAccount()">Delete account</button>
-						</div>
-					</div>
-					<p class="help">Required by the backend before unregistering.</p>
 				</div>
 			</div>
 
@@ -194,57 +197,74 @@
 				<p id="noConcertText" class="is-size-5">Select a concert from the search results.</p>
 
 				<div id="concertDetails" style="display:none;">
-					<div class="level">
-						<div class="level-left">
-							<h3 class="title is-3 mb-0" id="detailName"></h3>
-						</div>
-						<div class="level-right">
-							<div class="buttons">
-								<button class="button is-light" type="button" onclick="closeConcert()">Back to search</button>
-								<button class="button is-info is-light" type="button" onclick="shareConcert()">Share</button>
+					<div class="box">
+						<div class="level mb-4">
+							<div class="level-left">
+								<h3 class="title is-3 mb-0" id="detailName"></h3>
 							</div>
 						</div>
-					</div>
 
-					<div id="detailBadges" class="tags mb-4"></div>
-
-					<div class="columns">
-						<div class="column is-two-thirds">
-							<p><strong>Date:</strong> <span id="detailDate"></span></p>
-							<p><strong>Sale:</strong> <span id="detailSale"></span></p>
-							<p><strong>Venue:</strong> <span id="detailVenue"></span></p>
-							<p><strong>Artist:</strong> <span id="detailArtist"></span></p>
-							<p><a id="detailURL" href="#" target="_blank" rel="noreferrer">Ticketmaster page</a></p>
-							<p id="detailSeatmapLine"><a id="detailSeatmap" href="#" target="_blank" rel="noreferrer">Seat map</a></p>
-
-							<div class="buttons mt-4 if-login" style="display:none;">
-								<button id="favoriteAddButton" class="button is-success" type="button" onclick="addFavorite()">Add favorite</button>
-								<button id="favoriteDeleteButton" class="button is-warning is-light" type="button" onclick="deleteFavorite()">Remove favorite</button>
-								<button id="wtbAddButton" class="button is-link is-light" type="button" onclick="addWT('wtb')">WTB</button>
-								<button id="wtbDeleteButton" class="button is-link" type="button" onclick="deleteWT('wtb')">Remove WTB</button>
-								<button id="wtsAddButton" class="button is-info is-light" type="button" onclick="addWT('wts')">WTS</button>
-								<button id="wtsDeleteButton" class="button is-info" type="button" onclick="deleteWT('wts')">Remove WTS</button>
-							</div>
+						<div class="buttons mb-4">
+							<button class="button is-light" type="button" onclick="shareConcert()">Share</button>
+							<a id="detailURL" class="button is-info is-light" href="#" target="_blank" rel="noreferrer">Ticketmaster</a>
+							<a id="detailSeatmap" class="button is-info is-light" href="#" target="_blank" rel="noreferrer">Seat map</a>
+							<button id="favoriteAddButton" class="button is-primary" type="button" onclick="addFavorite()">Add favorite</button>
+							<button id="favoriteDeleteButton" class="button is-primary is-light" type="button" onclick="deleteFavorite()">Remove favorite</button>
+							<button id="wtbAddButton" class="button is-primary" type="button" onclick="addWT('wtb')">WTB</button>
+							<button id="wtbDeleteButton" class="button is-primary is-light" type="button" onclick="deleteWT('wtb')">Remove WTB</button>
+							<button id="wtsAddButton" class="button is-primary" type="button" onclick="addWT('wts')">WTS</button>
+							<button id="wtsDeleteButton" class="button is-primary is-light" type="button" onclick="deleteWT('wts')">Remove WTS</button>
 						</div>
-						<div class="column">
-							<figure class="image is-16by9">
-								<img id="detailPhoto" src="lib/concert.png" alt="Concert">
-							</figure>
+
+						<div class="columns is-variable is-5">
+							<div class="column is-two-thirds">
+								<div class="columns is-multiline is-variable is-3">
+									<div class="column is-half">
+										<p class="heading">Artist</p>
+										<p class="title is-5 mb-0" id="detailArtist"></p>
+									</div>
+									<div class="column is-half">
+										<p class="heading">Venue</p>
+										<p class="title is-5 mb-0" id="detailVenue"></p>
+									</div>
+									<div class="column is-half">
+										<p class="heading">Date</p>
+										<p class="title is-5 mb-0" id="detailDate"></p>
+										<div id="detailDateStatus" class="tags mt-2"></div>
+									</div>
+									<div class="column is-half">
+										<p class="heading">Sale</p>
+										<p class="title is-5 mb-0" id="detailSale"></p>
+										<div id="detailSaleStatus" class="tags mt-2"></div>
+									</div>
+								</div>
+							</div>
+							<div class="column">
+								<figure class="image is-16by9">
+									<img id="detailPhoto" class="is-rounded" src="lib/concert.png" alt="Concert">
+								</figure>
+							</div>
 						</div>
 					</div>
 
 					<div class="columns mt-5">
 						<div class="column">
-							<h4 class="title is-5">Potential setlist</h4>
-							<div id="detailSetlist" class="content"></div>
+							<div class="box">
+								<h4 class="title is-5">Potential setlist</h4>
+								<div id="detailSetlist" class="content"></div>
+							</div>
 						</div>
 						<div class="column">
-							<h4 class="title is-5">SNS</h4>
-							<div id="detailSNS" class="tags"></div>
+							<div class="box">
+								<h4 class="title is-5">SNS</h4>
+								<div id="detailSNS" class="tags"></div>
+							</div>
 						</div>
 						<div class="column">
-							<h4 class="title is-5">WTB / WTS</h4>
-							<div id="detailWT" class="content is-small"></div>
+							<div class="box">
+								<h4 class="title is-5">WTB / WTS</h4>
+								<div id="detailWT" class="content is-small"></div>
+							</div>
 						</div>
 					</div>
 				</div>

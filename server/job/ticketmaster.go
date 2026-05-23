@@ -20,7 +20,7 @@ const (
 	ticketmasterMusicClass  = "music"
 )
 
-var ticketmasterCountries = []string{"DE", "FR", "IT", "ES", "AT"}
+var ticketmasterCountries = []string{"FR", "DE", "BE", "NL", "LU", "CH", "AD", "GB", "IT", "MC", "ES"}
 
 // TicketmasterSyncStats summarizes one sync pass.
 type TicketmasterSyncStats struct {
