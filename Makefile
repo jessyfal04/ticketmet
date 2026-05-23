@@ -1,4 +1,4 @@
-.PHONY: test server docker-build docker-push docker-deploy deploy-check
+.PHONY: server docker-build docker-push docker-deploy deploy-check
 
 IMAGE ?= docker.io/jessyfal04/ticketmet:latest
 ERASE_DB ?= 0
@@ -9,18 +9,6 @@ export TICKETMASTER_API_KEY
 export TICKETMASTER_CONSUMER_SECRET
 export SETLISTFM_API_KEY
 export ERASE_DB
-
-TEST_SCRIPTS := $(wildcard server/test/*.sh)
-
-test:
-	@if [ -z "$(TEST_SCRIPTS)" ]; then \
-		echo "No test scripts found in server/test"; \
-		exit 0; \
-	fi; \
-	for f in $(TEST_SCRIPTS); do \
-		echo ">> $$f"; \
-		bash "$$f"; \
-	done
 
 server:
 	go -C server run ./main

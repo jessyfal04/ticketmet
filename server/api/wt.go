@@ -118,15 +118,9 @@ func handleWTAdd(dbChan chan<- job.DBRequest) http.HandlerFunc {
 			return
 		}
 
-		// Insert WTB/WTS row and remove opposite if exists
+		// Insert or replace the single WTB/WTS row for this user/concert
 		if err := job.SqlExec(r.Context(), dbChan, `
-		DELETE FROM wt
-		WHERE user_id = ? AND concert_id = ? AND type <> ?`, user.ID, concertID, wtType); err != nil {
-			logHttpError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-		if err := job.SqlExec(r.Context(), dbChan, `
-		INSERT OR IGNORE INTO wt (user_id, concert_id, type)
+		INSERT OR REPLACE INTO wt (user_id, concert_id, type)
 		VALUES (?, ?, ?)`, user.ID, concertID, wtType); err != nil {
 			logHttpError(w, http.StatusInternalServerError, "", err)
 			return

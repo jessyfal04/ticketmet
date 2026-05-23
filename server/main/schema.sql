@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS wt (
 	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	concert_id INTEGER NOT NULL REFERENCES concerts(id) ON DELETE CASCADE,
 	type TEXT NOT NULL CHECK (type IN ('wtb', 'wts')),
-	PRIMARY KEY (user_id, concert_id, type)
+	PRIMARY KEY (user_id, concert_id)
 );
 
 CREATE TABLE IF NOT EXISTS favorites (

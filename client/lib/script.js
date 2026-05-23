@@ -231,7 +231,7 @@ function toggleConnected(connected) {
 }
 
 function handleAuthRequired(xhr) {
-	if (!xhr || (xhr.status != 401 && xhr.status != 403)) {
+	if (!xhr || xhr.status != 401) {
 		return false;
 	}
 

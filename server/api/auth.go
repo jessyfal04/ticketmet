@@ -163,7 +163,7 @@ func handleUnregister(dbChan chan<- job.DBRequest) http.HandlerFunc {
 
 		// Check password
 		if user.PasswordHash != "" && bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(body.Password)) != nil {
-			logHttpError(w, http.StatusUnauthorized, "invalid password", nil)
+			logHttpError(w, http.StatusForbidden, "invalid password", nil)
 			return
 		}
 
