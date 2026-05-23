@@ -15,6 +15,7 @@ import (
 const (
 	ticketmasterURL         = "https://app.ticketmaster.com/discovery/v2/events.json"
 	ticketmasterHTTPTimeout = 10 * time.Second
+	ticketmasterRequestGap  = 1 * time.Second
 	ticketmasterPageSize    = 200
 	ticketmasterMaxPages    = 5
 	ticketmasterMusicClass  = "music"
@@ -132,6 +133,11 @@ func SyncTicketmaster(ctx context.Context, dbChan chan<- DBRequest, apiKey strin
 	// newMaxVisibility will track the most recent public visibility
 	newMaxVisibility := maxVisibility
 	for _, event := range events {
+		visibility := model.ParseTimeText(event.PublicVisibilityStartDateTime)
+		if visibility.After(newMaxVisibility) {
+			newMaxVisibility = visibility
+		}
+
 		saved, err := saveEvent(ctx, dbChan, event)
 		if err != nil {
 			return stats, err
@@ -140,10 +146,6 @@ func SyncTicketmaster(ctx context.Context, dbChan chan<- DBRequest, apiKey strin
 		// Update stats and newMaxVisibility if possible
 		if saved {
 			stats.Saved++
-			visibility := model.ParseTimeText(event.PublicVisibilityStartDateTime)
-			if visibility.After(newMaxVisibility) {
-				newMaxVisibility = visibility
-			}
 		} else {
 			stats.Skipped++
 		}
@@ -196,6 +198,10 @@ func fetchTicketmasterEvents(ctx context.Context, apiKey string, maxVisibility t
 			// Adding to the agg list
 			events = append(events, payload.Embedded.Events...)
 
+			if err := ticketmasterPause(ctx); err != nil {
+				return nil, err
+			}
+
 			// If we are at the last page, we can stop fetching for this country.
 			if payload.Page.Number+1 >= payload.Page.TotalPages {
 				break
@@ -204,6 +210,18 @@ func fetchTicketmasterEvents(ctx context.Context, apiKey string, maxVisibility t
 	}
 
 	return events, nil
+}
+
+// Pause for 1 second between Ticketmaster requests
+func ticketmasterPause(ctx context.Context) error {
+	timer := time.NewTimer(ticketmasterRequestGap)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 // Save one Ticketmaster event into the database

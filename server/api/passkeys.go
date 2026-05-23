@@ -218,13 +218,13 @@ func handlePasskeyLoginFinish(dbChan chan<- job.DBRequest) http.HandlerFunc {
 				return loadWebAuthnUser(r, dbChan, id)
 			}, wa_sessionData, r)
 		if err != nil {
-			logHttpError(w, http.StatusUnauthorized, "invalid passkey", err)
+			logHttpError(w, http.StatusBadRequest, "invalid passkey", err)
 			return
 		}
 		// Type assert to our webAuthnUser model
 		resolved, ok := resolvedUser.(webAuthnUser)
 		if !ok {
-			logHttpError(w, http.StatusUnauthorized, "invalid passkey user", nil)
+			logHttpError(w, http.StatusBadRequest, "invalid passkey user", nil)
 			return
 		}
 		user = resolved

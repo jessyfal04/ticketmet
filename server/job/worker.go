@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -60,8 +61,10 @@ func getJSONQuery(ctx context.Context, client *http.Client, rawURL string, query
 	}
 
 	// Execute the request and close the body
+	log.Printf("[http] GET %s", rawURL)
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Printf("[http] GET failed %s: %v", rawURL, err)
 		return err
 	}
 	defer resp.Body.Close()

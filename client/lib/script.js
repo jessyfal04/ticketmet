@@ -224,6 +224,7 @@ function toggleConnected(connected) {
 	}
 	renderAccount();
 	renderAlertBlock();
+	renderConcertActions();
 	if (connected) {
 		loadPasskeys();
 		loadProfile();
@@ -915,6 +916,18 @@ function setWT(method, type, message) {
 
 function renderConcertActions() {
 	if (!selectedConcert) return;
+
+	let connected = !!user;
+	$("#detailLoginText").css("display", connected ? "none" : "");
+	if (!connected) {
+		$("#favoriteAddButton").hide();
+		$("#favoriteDeleteButton").hide();
+		$("#wtbAddButton").hide();
+		$("#wtbDeleteButton").hide();
+		$("#wtsAddButton").hide();
+		$("#wtsDeleteButton").hide();
+		return;
+	}
 
 	let concertID = String(itemID(selectedConcert));
 	let expired = isExpiredConcert(selectedConcert);
