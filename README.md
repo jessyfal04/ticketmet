@@ -46,7 +46,7 @@ Elle facilite la mise en relation via les SNS pour faire du WTB/WTS et pour se r
 - Alert
   - id / userId / targetType / targetId / createdAt
 - SyncTicketmaster
-  - lastPublicVisibilityStartDateTime (ex: 2026-03-24T21:59:47Z)
+  - max_visibility (ex: 2026-03-24T21:59:47Z)
 
 ## API Web
 - https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
@@ -78,15 +78,14 @@ Setlist potentielle / par artiste (via attractions name)
   - Récupérer `sets.song.name` pour la liste des titres
 
 ## Mise à jour
-- publicVisibilityStartDateTime : filtre de nouveauté (SyncTicketmaster.lastPublicVisibilityStartDateTime)
+- publicVisibilityStartDateTime : filtre de nouveauté (SyncTicketmaster.max_visibility)
 - Récupération + insertion des concerts via Ticketmaster
 - Pays synchronisés pour l'instant : Allemagne (`DE`), France (`FR`), Italie (`IT`), Espagne (`ES`) et Autriche (`AT`)
 - Job automatique toutes les 15 minutes, avec clé Ticketmaster fournie par le shell (`TICKETMASTER_API_KEY`)
 - Le job Ticketmaster tourne en goroutine background.
 - Nettoyage sync actuel : ignore les events sans venue/artiste nommé, garde une seule photo 16:9 de meilleure qualité, ignore les dates de vente aberrantes avant 2000
-- Vérification des alerts utilisateur vis à vis des venues / artists
+- Vérification des alerts de nouveauté, des alerts de vente et des matches WTB/WTS via le radar d'alertes
 - Déduplication des notifications déjà envoyées via `notifications.dedupe_key`
-- Vérification des alerts de vente pour les concerts en favorites
 - Récup setlist du concert si artiste dispo dans setlist.fm
 
 ## Requêtes implémentées actuellement
@@ -198,7 +197,8 @@ Setlist potentielle / par artiste (via attractions name)
 - API : `server/api`, handlers pour `/api/concerts`, `/api/artists`, `/api/venues`, `/api/setlist`, `/api/favorites`, `/api/wt`, `/api/me`, `/api/alerts`, `/healthz`.
 - Auth : email/password avec bcrypt, sessions serveur par cookie HttpOnly `session`, passkeys WebAuthn via `github.com/go-webauthn/webauthn`.
 - WebAuthn : domaine configuré dans `server/api/passkeys.go` pour `ticketmet.jessyfal04.dev`.
-- Sync Ticketmaster : `server/job/ticketmaster.go`, lancé dans une goroutine au démarrage puis toutes les 15 minutes.
+- Sync Ticketmaster : `server/job/ticketmaster.go`, lancé dans une goroutine au démarrage puis toutes les 15 minutes, avec `max_visibility`.
+- Radar d'alertes : `server/job/alertradar.go`, lancé dans une goroutine au démarrage, regroupe les alerts de nouveauté, de vente et les matches WTB/WTS puis envoie un mail par utilisateur.
 - Secrets : `.secrets/ticketmaster.mk`, chargé par le `Makefile`, ignoré par Git.
 - Déploiement : image Docker `docker.io/jessyfal04/ticketmet:latest`, DB persistée dans `/app/data/ticketmet.sqlite3`
 - Setlist.fm : `server/job/setlistfm.go`, lancé dans une goroutine au démarrage et utilisé par `GET /api/setlist/{concertId}` si `SETLISTFM_API_KEY` est fourni.

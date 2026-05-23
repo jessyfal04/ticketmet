@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"server/api"
@@ -61,7 +60,7 @@ func main() {
 
 	// Start Setlist.fm
 	setlistChan := make(chan job.SetlistRequest, 32)
-	job.RunSetlistFMServer(context.Background(), dbChan, strings.TrimSpace(job.Getenv("SETLISTFM_API_KEY", "")), setlistChan)
+	job.RunSetlistFMServer(context.Background(), dbChan, job.Getenv("SETLISTFM_API_KEY", ""), setlistChan)
 
 	// Start HTTP server
 	clientDir := job.Getenv("CLIENT_DIR", "../client")
@@ -109,4 +108,3 @@ func openDB(path string) (*sql.DB, error) {
 	}
 	return db, nil
 }
-

@@ -46,11 +46,11 @@ func ScanConcert(row Scanner) (Concert, error) {
 	if err != nil {
 		return Concert{}, err
 	}
-	concert.Date = parseTime(date)
+	concert.Date = ParseTimeText(date)
 	if photoURL != "" {
 		concert.Photos = []string{photoURL}
 	}
-	concert.SaleStartDateTime = parseTime(saleStart)
+	concert.SaleStartDateTime = ParseTimeText(saleStart)
 	return concert, nil
 }
 
@@ -59,27 +59,15 @@ func ScanDisplayConcert(row Scanner) (DisplayConcert, error) {
 	var date string
 	var photoURL string
 	var saleStart string
-	err := row.Scan(
-		&concert.ID,
-		&concert.Name,
-		&date,
-		&concert.VenueID,
-		&concert.ArtistID,
-		&concert.URL,
-		&photoURL,
-		&concert.SeatmapURL,
-		&saleStart,
-		&concert.VenueName,
-		&concert.ArtistName,
-	)
+	err := row.Scan(&concert.ID, &concert.Name, &date, &concert.VenueID, &concert.ArtistID, &concert.URL, &photoURL, &concert.SeatmapURL, &saleStart, &concert.VenueName, &concert.ArtistName)
 	if err != nil {
 		return DisplayConcert{}, err
 	}
-	concert.Date = parseTime(date)
+	concert.Date = ParseTimeText(date)
 	if photoURL != "" {
 		concert.Photos = []string{photoURL}
 	}
-	concert.SaleStartDateTime = parseTime(saleStart)
+	concert.SaleStartDateTime = ParseTimeText(saleStart)
 	return concert, nil
 }
 
@@ -91,15 +79,7 @@ func ScanUser(row Scanner) (User, error) {
 
 func ScanPasskey(row Scanner) (Passkey, error) {
 	var passkey Passkey
-	err := row.Scan(
-		&passkey.CredentialID,
-		&passkey.PublicKey,
-		&passkey.SignCount,
-		&passkey.UserPresent,
-		&passkey.UserVerified,
-		&passkey.BackupEligible,
-		&passkey.BackupState,
-	)
+	err := row.Scan(&passkey.CredentialID, &passkey.PublicKey, &passkey.SignCount, &passkey.UserPresent, &passkey.UserVerified, &passkey.BackupEligible, &passkey.BackupState)
 	return passkey, err
 }
 
@@ -119,28 +99,15 @@ func ScanProfileWT(row Scanner) (ProfileWT, error) {
 	var date string
 	var photoURL string
 	var saleStart string
-	err := row.Scan(
-		&wt.Type,
-		&wt.Concert.ID,
-		&wt.Concert.Name,
-		&date,
-		&wt.Concert.VenueID,
-		&wt.Concert.ArtistID,
-		&wt.Concert.URL,
-		&photoURL,
-		&wt.Concert.SeatmapURL,
-		&saleStart,
-		&wt.Concert.VenueName,
-		&wt.Concert.ArtistName,
-	)
+	err := row.Scan(&wt.Type, &wt.Concert.ID, &wt.Concert.Name, &date, &wt.Concert.VenueID, &wt.Concert.ArtistID, &wt.Concert.URL, &photoURL, &wt.Concert.SeatmapURL, &saleStart, &wt.Concert.VenueName, &wt.Concert.ArtistName)
 	if err != nil {
 		return ProfileWT{}, err
 	}
-	wt.Concert.Date = parseTime(date)
+	wt.Concert.Date = ParseTimeText(date)
 	if photoURL != "" {
 		wt.Concert.Photos = []string{photoURL}
 	}
-	wt.Concert.SaleStartDateTime = parseTime(saleStart)
+	wt.Concert.SaleStartDateTime = ParseTimeText(saleStart)
 	return wt, nil
 }
 
@@ -150,10 +117,39 @@ func ScanProfileAlert(row Scanner) (ProfileAlert, error) {
 	return alert, err
 }
 
-func parseTime(value string) time.Time {
+func ScanAlertConcertCandidate(row Scanner) (AlertConcertCandidate, error) {
+	var candidate AlertConcertCandidate
+	err := row.Scan(&candidate.UserID, &candidate.Email, &candidate.DedupeKey, &candidate.ConcertID, &candidate.ConcertName, &candidate.ArtistName, &candidate.VenueName, &candidate.ConcertDate, &candidate.TargetType)
+	return candidate, err
+}
+
+func ScanAlertFavoriteCandidate(row Scanner) (AlertFavoriteCandidate, error) {
+	var candidate AlertFavoriteCandidate
+	err := row.Scan(&candidate.UserID, &candidate.Email, &candidate.DedupeKey, &candidate.ConcertID, &candidate.ConcertName, &candidate.ArtistName, &candidate.VenueName, &candidate.ConcertDate)
+	return candidate, err
+}
+
+func ScanAlertTradeCandidate(row Scanner) (AlertTradeCandidate, error) {
+	var candidate AlertTradeCandidate
+	err := row.Scan(&candidate.UserID, &candidate.Email, &candidate.DedupeKey, &candidate.ConcertID, &candidate.ConcertName, &candidate.ArtistName, &candidate.VenueName, &candidate.ConcertDate, &candidate.SelfType, &candidate.PeerType)
+	return candidate, err
+}
+
+func ScanTime(row Scanner) (time.Time, error) {
+	var value string
+	err := row.Scan(&value)
+	return ParseTimeText(value), err
+}
+
+func ParseTimeText(value string) time.Time {
 	if value == "" {
 		return time.Time{}
 	}
-	t, _ := time.Parse(time.RFC3339, value)
-	return t
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return t
+	}
+	if t, err := time.Parse("2006-01-02", value); err == nil {
+		return t
+	}
+	return time.Time{}
 }

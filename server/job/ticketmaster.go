@@ -2,30 +2,58 @@ package job
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"log"
 	"net/http"
 	"net/url"
+	"server/model"
 	"strconv"
 	"time"
 )
 
 const (
-	ticketmasterURL        = "https://app.ticketmaster.com/discovery/v2/events.json"
-	ticketmasterSyncEvery  = 5 * time.Minute
-	ticketmasterPageSize   = 200
-	ticketmasterMaxPages   = 5
-	ticketmasterMusicClass = "music"
+	ticketmasterURL         = "https://app.ticketmaster.com/discovery/v2/events.json"
+	ticketmasterHTTPTimeout = 10 * time.Second
+	ticketmasterPageSize    = 200
+	ticketmasterMaxPages    = 5
+	ticketmasterMusicClass  = "music"
 )
 
-var ticketmasterCountries = []string{"DE", "FR"}
+var ticketmasterCountries = []string{"DE", "FR", "IT", "ES", "AT"}
 
-type ticketmasterResponse struct {
+// TicketmasterSyncStats summarizes one sync pass.
+type TicketmasterSyncStats struct {
+	StartedAt time.Time
+	Fetched   int
+	Saved     int
+	Skipped   int
+}
+
+// Stats to string for log
+func (s TicketmasterSyncStats) String() string {
+	return fmt.Sprintf(
+		"[Ticketmaster] fetched=%d saved=%d skipped=%d duration=%s",
+		s.Fetched, s.Saved, s.Skipped, time.Since(s.StartedAt).Round(time.Millisecond),
+	)
+}
+
+// Start the periodic Ticketmaster sync
+func RunTicketmaster(ctx context.Context, dbChan chan<- DBRequest, apiKey string, interval time.Duration) {
+	runEvery(ctx, interval, func() {
+		stats, err := SyncTicketmaster(ctx, dbChan, apiKey)
+		if err != nil {
+			log.Printf("[Ticketmaster] failed: %v (%s)", err, stats)
+			return
+		}
+		log.Print(stats)
+	})
+}
+
+// Response of Ticketmaster events API
+type ticketmasterResp_Page struct {
 	Embedded struct {
-		Events []ticketmasterEvent `json:"events"`
+		Events []ticketmasterResp_Event `json:"events"`
 	} `json:"_embedded"`
 	Page struct {
 		Number     int `json:"number"`
@@ -33,13 +61,17 @@ type ticketmasterResponse struct {
 	} `json:"page"`
 }
 
-type ticketmasterEvent struct {
+// One Ticketmaster event
+type ticketmasterResp_Event struct {
 	ID                            string `json:"id"`
 	Name                          string `json:"name"`
 	URL                           string `json:"url"`
 	PublicVisibilityStartDateTime string `json:"publicVisibilityStartDateTime"`
 	Images                        []struct {
-		URL string `json:"url"`
+		Ratio  string `json:"ratio"`
+		URL    string `json:"url"`
+		Width  int    `json:"width"`
+		Height int    `json:"height"`
 	} `json:"images"`
 	Dates struct {
 		Start struct {
@@ -74,129 +106,123 @@ type ticketmasterEvent struct {
 	} `json:"_embedded"`
 }
 
-func StartTicketmaster(db *sql.DB, apiKey string) {
-	if apiKey == "" {
-		log.Printf("Ticketmaster sync disabled: TICKETMASTER_API_KEY is empty")
-		return
+// One sync for Ticketmaster
+func SyncTicketmaster(ctx context.Context, dbChan chan<- DBRequest, apiKey string) (TicketmasterSyncStats, error) {
+	// Stats with start time
+	stats := TicketmasterSyncStats{StartedAt: time.Now().UTC()}
+
+	// Get the current visibility watermark to fetch only new events
+	maxVisibility, err := SqlScanOne(ctx, dbChan, `
+		SELECT max_visibility
+		FROM sync_ticketmaster
+		WHERE id = 1`,
+		model.ScanTime)
+	if err != nil {
+		return stats, err
 	}
 
-	go func() {
-		for {
-			if err := SyncTicketmaster(context.Background(), db, apiKey); err != nil {
-				log.Printf("Ticketmaster sync failed: %v", err)
-			} else {
-				log.Printf("Ticketmaster sync done")
-			}
-			time.Sleep(ticketmasterSyncEvery)
+	// Fetch the events from Ticketmaster API
+	events, err := fetchTicketmasterEvents(ctx, apiKey, maxVisibility)
+	if err != nil {
+		return stats, err
+	}
+	stats.Fetched = len(events)
+
+	// Save the events in the db
+	// newMaxVisibility will track the most recent public visibility
+	newMaxVisibility := maxVisibility
+	for _, event := range events {
+		saved, err := saveEvent(ctx, dbChan, event)
+		if err != nil {
+			return stats, err
 		}
-	}()
+
+		// Update stats and newMaxVisibility if possible
+		if saved {
+			stats.Saved++
+			visibility := model.ParseTimeText(event.PublicVisibilityStartDateTime)
+			if visibility.After(newMaxVisibility) {
+				newMaxVisibility = visibility
+			}
+		} else {
+			stats.Skipped++
+		}
+	}
+
+	// Update the max visibility
+	if err := SqlExec(ctx, dbChan, `
+		INSERT INTO sync_ticketmaster (id, max_visibility)
+		VALUES (1, ?)
+		ON CONFLICT(id) DO UPDATE SET max_visibility = excluded.max_visibility`,
+		newMaxVisibility.UTC().Format(time.RFC3339)); err != nil {
+		return stats, err
+	}
+
+	return stats, nil
 }
 
-func SyncTicketmaster(ctx context.Context, db *sql.DB, apiKey string) error {
-	lastSync, err := readLastSync(ctx, db)
-	if err != nil {
-		return err
-	}
+// Fetch all Ticketmaster pages for the configured countries.
+func fetchTicketmasterEvents(ctx context.Context, apiKey string, maxVisibility time.Time) ([]ticketmasterResp_Event, error) {
+	// Event list
+	var events []ticketmasterResp_Event
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	// Client with timeout.
+	client := &http.Client{Timeout: ticketmasterHTTPTimeout}
 
-	maxVisibility := lastSync
+	// For each country
 	for _, country := range ticketmasterCountries {
-		countryMax, err := syncCountry(ctx, tx, apiKey, country, lastSync)
-		if err != nil {
-			return err
-		}
-		if countryMax.After(maxVisibility) {
-			maxVisibility = countryMax
-		}
-	}
+		log.Printf("[Ticketmaster] fetching country=%s", country)
 
-	// Ticketmaster does not always send publicVisibilityStartDateTime.
-	// If nothing better was found, remember "now" to avoid full resync forever.
-	if !maxVisibility.After(lastSync) {
-		maxVisibility = time.Now().UTC()
-	}
-	if err := saveLastSync(ctx, tx, maxVisibility); err != nil {
-		return err
-	}
-
-	return tx.Commit()
-}
-
-func syncCountry(ctx context.Context, tx *sql.Tx, apiKey string, country string, lastSync time.Time) (time.Time, error) {
-	maxVisibility := lastSync
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	for page := 0; page < ticketmasterMaxPages; page++ {
-		payload, err := fetchPage(ctx, client, apiKey, country, lastSync, page)
-		if err != nil {
-			return maxVisibility, err
-		}
-
-		for _, event := range payload.Embedded.Events {
-			visibility, saved, err := saveEvent(ctx, tx, event)
-			if err != nil {
-				return maxVisibility, err
+		// For each page until the max
+		for page := 0; page < ticketmasterMaxPages; page++ {
+			// Build the query.
+			q := url.Values{}
+			q.Set("apikey", apiKey)
+			q.Set("classificationName", ticketmasterMusicClass)
+			q.Set("countryCode", country)
+			q.Set("size", strconv.Itoa(ticketmasterPageSize))
+			q.Set("page", strconv.Itoa(page))
+			if !maxVisibility.IsZero() { // if we have a visibility, we filter
+				q.Set("publicVisibilityStartDateTime", maxVisibility.UTC().Format(time.RFC3339))
 			}
-			if saved && visibility.After(maxVisibility) {
-				maxVisibility = visibility
+
+			// Response payload.
+			var payload ticketmasterResp_Page
+			// Make the request.
+			if err := getJSONQuery(ctx, client, ticketmasterURL, q, nil, &payload, false); err != nil {
+				return nil, err
+			}
+
+			// Adding to the agg list
+			events = append(events, payload.Embedded.Events...)
+
+			// If we are at the last page, we can stop fetching for this country.
+			if payload.Page.Number+1 >= payload.Page.TotalPages {
+				break
 			}
 		}
-
-		if payload.Page.Number+1 >= payload.Page.TotalPages {
-			break
-		}
 	}
 
-	return maxVisibility, nil
+	return events, nil
 }
 
-func fetchPage(ctx context.Context, client *http.Client, apiKey string, country string, lastSync time.Time, page int) (ticketmasterResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildURL(apiKey, country, lastSync, page), nil)
-	if err != nil {
-		return ticketmasterResponse{}, err
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return ticketmasterResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return ticketmasterResponse{}, fmt.Errorf("%s page %d: ticketmaster status=%d", country, page, resp.StatusCode)
-	}
-
-	var payload ticketmasterResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return ticketmasterResponse{}, err
-	}
-	return payload, nil
-}
-
-func saveEvent(ctx context.Context, tx *sql.Tx, event ticketmasterEvent) (time.Time, bool, error) {
-	// Empty venues/artists make filters unusable, so do not keep those events.
+// Save one Ticketmaster event into the database
+func saveEvent(ctx context.Context, dbChan chan<- DBRequest, event ticketmasterResp_Event) (bool, error) {
+	// We reject events without usable event/venue/attraction data
 	if len(event.Embedded.Venues) == 0 || len(event.Embedded.Attractions) == 0 {
-		return time.Time{}, false, nil
+		return false, nil
 	}
 	venue := event.Embedded.Venues[0]
 	artist := event.Embedded.Attractions[0]
-	if venue.ID == "" || venue.Name == "" || artist.ID == "" || artist.Name == "" {
-		return time.Time{}, false, nil
+	venueOK, venueID := stableID(venue.ID)
+	artistOK, artistID := stableID(artist.ID)
+	concertOK, concertID := stableID(event.ID)
+	if event.Name == "" || venue.Name == "" || artist.Name == "" || !venueOK || !artistOK || !concertOK {
+		return false, nil
 	}
 
-	venueID := stableID(venue.ID)
-	artistID := stableID(artist.ID)
-	concertID := stableID(event.ID)
-	if venueID == 0 || artistID == 0 || concertID == 0 {
-		return time.Time{}, false, nil
-	}
-
-	if _, err := tx.ExecContext(ctx, `
+	// Try saving the venue, can update if it already exists, if already here error
+	if err := SqlExec(ctx, dbChan, `
 		INSERT INTO venues (id, name, city, country)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
@@ -204,18 +230,24 @@ func saveEvent(ctx context.Context, tx *sql.Tx, event ticketmasterEvent) (time.T
 			city = excluded.city,
 			country = excluded.country`,
 		venueID, venue.Name, venue.City.Name, venue.Country.CountryCode); err != nil {
-		return time.Time{}, false, err
+		return false, err
 	}
 
-	if _, err := tx.ExecContext(ctx, `
+	// Try saving the artist, can update if it already exists, if already here error
+	if err := SqlExec(ctx, dbChan, `
 		INSERT INTO artists (id, name)
 		VALUES (?, ?)
 		ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
 		artistID, artist.Name); err != nil {
-		return time.Time{}, false, err
+		return false, err
 	}
 
-	if _, err := tx.ExecContext(ctx, `
+	dateValue := ticketmasterDateValue(event)
+
+	saleValue := ticketmasterSaleValue(event.Sales.Public.StartDateTime)
+
+	// Save the concert details
+	if err := SqlExec(ctx, dbChan, `
 		INSERT INTO concerts (id, name, date, venue_id, artist_id, url, photo_url, seatmap_url, sale_start_datetime)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
@@ -224,130 +256,85 @@ func saveEvent(ctx context.Context, tx *sql.Tx, event ticketmasterEvent) (time.T
 			venue_id = excluded.venue_id,
 			artist_id = excluded.artist_id,
 			url = excluded.url,
-			photo_url = excluded.photo_url,
-			seatmap_url = excluded.seatmap_url,
-			sale_start_datetime = excluded.sale_start_datetime`,
-		concertID,
-		event.Name,
-		formatTime(eventDate(event)),
-		venueID,
-		artistID,
-		event.URL,
-		firstImage(event),
-		event.Seatmap.StaticURL,
-		formatTime(saleDate(event.Sales.Public.StartDateTime))); err != nil {
-		return time.Time{}, false, err
+		photo_url = excluded.photo_url,
+		seatmap_url = excluded.seatmap_url,
+		sale_start_datetime = excluded.sale_start_datetime`,
+		concertID, event.Name, dateValue, venueID, artistID, event.URL, ticketmasterBestImage(event), event.Seatmap.StaticURL, saleValue); err != nil {
+		return false, err
 	}
-
-	visibility, _ := parseTime(event.PublicVisibilityStartDateTime)
-	return visibility, true, nil
+	return true, nil
 }
 
-func readLastSync(ctx context.Context, db *sql.DB) (time.Time, error) {
-	var value string
-	err := db.QueryRowContext(ctx, `
-		SELECT last_public_visibility_start_datetime
-		FROM sync_ticketmaster
-		WHERE id = 1`).Scan(&value)
-	if err == sql.ErrNoRows {
-		return time.Time{}, nil
-	}
-	if err != nil {
-		return time.Time{}, err
-	}
+// Helpeur Ticketmaster
 
-	parsed, _ := parseTime(value)
-	return parsed, nil
+// Ticketmaster can return placeholder sale dates like 1900-01-01.
+func ticketmasterSaleValue(value string) string {
+	parsed := model.ParseTimeText(value)
+	if parsed.IsZero() || parsed.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) {
+		return ""
+	}
+	return parsed.UTC().Format(time.RFC3339)
 }
 
-func saveLastSync(ctx context.Context, tx *sql.Tx, value time.Time) error {
-	_, err := tx.ExecContext(ctx, `
-		INSERT INTO sync_ticketmaster (id, last_public_visibility_start_datetime)
-		VALUES (1, ?)
-		ON CONFLICT(id) DO UPDATE SET last_public_visibility_start_datetime = excluded.last_public_visibility_start_datetime`,
-		value.UTC().Format(time.RFC3339))
-	return err
-}
+// Ticketmaster can return the event date in a few different positions
+func ticketmasterDateValue(event ticketmasterResp_Event) string {
+	// We keep the first valid value and normalize everything to RFC3339 UTC.
 
-func buildURL(apiKey string, country string, lastSync time.Time, page int) string {
-	u, _ := url.Parse(ticketmasterURL)
-	q := u.Query()
-	q.Set("apikey", apiKey)
-	q.Set("classificationName", ticketmasterMusicClass)
-	q.Set("countryCode", country)
-	q.Set("size", strconv.Itoa(ticketmasterPageSize))
-	q.Set("page", strconv.Itoa(page))
-	if !lastSync.IsZero() {
-		q.Set("publicVisibilityStartDateTime", lastSync.UTC().Format(time.RFC3339))
-	}
-	u.RawQuery = q.Encode()
-	return u.String()
-}
-
-func eventDate(event ticketmasterEvent) time.Time {
-	if parsed, ok := parseTime(event.Dates.Start.DateTime); ok {
-		return parsed
+	// dates.start.dateTime
+	if parsed := model.ParseTimeText(event.Dates.Start.DateTime); !parsed.IsZero() {
+		return parsed.UTC().Format(time.RFC3339)
 	}
 
+	// dates.start.localDate + dates.start.localTime
 	if event.Dates.Start.LocalDate != "" && event.Dates.Start.LocalTime != "" {
 		value := event.Dates.Start.LocalDate + "T" + event.Dates.Start.LocalTime
 		for _, layout := range []string{"2006-01-02T15:04:05", "2006-01-02T15:04"} {
 			if parsed, err := time.Parse(layout, value); err == nil {
-				return parsed
+				return parsed.UTC().Format(time.RFC3339)
 			}
 		}
 	}
 
-	if event.Dates.Start.LocalDate != "" {
-		if parsed, err := time.Parse("2006-01-02", event.Dates.Start.LocalDate); err == nil {
-			return parsed
-		}
+	// dates.start.dateTime
+	if parsed, err := time.Parse("2006-01-02", event.Dates.Start.LocalDate); err == nil {
+		return parsed.UTC().Format(time.RFC3339)
 	}
 
-	return time.Time{}
-}
-
-func saleDate(value string) time.Time {
-	parsed, _ := parseTime(value)
-	// Ticketmaster sometimes returns placeholder dates like 1900-01-01.
-	if parsed.Before(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		return time.Time{}
-	}
-	return parsed
-}
-
-func parseTime(value string) (time.Time, bool) {
-	if value == "" {
-		return time.Time{}, false
-	}
-	parsed, err := time.Parse(time.RFC3339, value)
-	return parsed, err == nil
-}
-
-func firstImage(event ticketmasterEvent) string {
-	// Ticketmaster sends the same artwork many times in different sizes.
-	for _, image := range event.Images {
-		if image.URL != "" {
-			return image.URL
-		}
-	}
 	return ""
 }
 
-func formatTime(value time.Time) string {
-	if value.IsZero() {
-		return ""
+// Pick the best image Ticketmaster gives us
+func ticketmasterBestImage(event ticketmasterResp_Event) string {
+	// We pick the image with the higher score among every available one
+	best := ""
+	bestScore := -1
+	for _, image := range event.Images {
+		// Need an URL
+		if image.URL == "" {
+			continue
+		}
+
+		// Score is by image size, + *10 bonus if it's 16:9 ratio
+		score := image.Width * image.Height
+		if image.Ratio == "16_9" {
+			score *= 10
+		}
+
+		// If it's the current best, we keep it
+		if score > bestScore {
+			bestScore = score
+			best = image.URL
+		}
 	}
-	return value.UTC().Format(time.RFC3339)
+	return best
 }
 
-func stableID(value string) int {
+// SQLite ID from Ticketmaster ID
+func stableID(value string) (bool, int) {
 	if value == "" {
-		return 0
+		return false, 42
 	}
+	// We use a hash to convert the Ticketmaster string id to a SQLite int id.
 	id := int(crc32.ChecksumIEEE([]byte(value)))
-	if id == 0 {
-		return 1
-	}
-	return id
+	return true, id
 }

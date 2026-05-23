@@ -100,6 +100,42 @@ type ProfileAlert struct {
 	TargetName string
 }
 
+type AlertConcertCandidate struct {
+	UserID      int
+	Email       string
+	DedupeKey   string
+	ConcertID   int
+	ConcertName string
+	ArtistName  string
+	VenueName   string
+	ConcertDate string
+	TargetType  string
+}
+
+type AlertFavoriteCandidate struct {
+	UserID      int
+	Email       string
+	DedupeKey   string
+	ConcertID   int
+	ConcertName string
+	ArtistName  string
+	VenueName   string
+	ConcertDate string
+}
+
+type AlertTradeCandidate struct {
+	UserID      int
+	Email       string
+	DedupeKey   string
+	ConcertID   int
+	ConcertName string
+	ArtistName  string
+	VenueName   string
+	ConcertDate string
+	SelfType    string
+	PeerType    string
+}
+
 type Favorite struct {
 	UserID    int
 	ConcertID int

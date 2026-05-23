@@ -6,8 +6,7 @@ import (
 )
 
 type setlistResponse struct {
-	Songs   []string
-	Fetched bool
+	Songs []string
 }
 
 // Get the potential setlist for a concert.
@@ -18,11 +17,13 @@ func handleConcertSetlist(setlistChan chan<- job.SetlistRequest) http.HandlerFun
 			return
 		}
 
-		result, err := job.RequestSetlist(r.Context(), setlistChan, concertID)
-		if err != nil {
-			logHttpError(w, http.StatusInternalServerError, "", err)
+		ret := make(chan job.SetlistResult)
+		setlistChan <- job.SetlistRequest{ConcertID: concertID, Ret: ret}
+		result := <-ret
+		if result.Err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", result.Err)
 			return
 		}
-		writeJSON(w, setlistResponse{Songs: result.Songs, Fetched: result.Fetched})
+		writeJSON(w, setlistResponse{Songs: result.Songs})
 	}
 }

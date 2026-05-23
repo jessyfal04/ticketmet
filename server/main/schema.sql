@@ -100,5 +100,8 @@ CREATE TABLE IF NOT EXISTS setlists (
 
 CREATE TABLE IF NOT EXISTS sync_ticketmaster (
 	id INTEGER PRIMARY KEY CHECK (id = 1),
-	last_public_visibility_start_datetime TEXT NOT NULL
+	max_visibility TEXT NOT NULL
 );
+
+INSERT OR IGNORE INTO sync_ticketmaster (id, max_visibility)
+VALUES (1, '');
