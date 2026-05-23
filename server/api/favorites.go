@@ -63,8 +63,8 @@ func handleFavoriteAdd(dbChan chan<- job.DBRequest) http.HandlerFunc {
 
 		// Insert favorite
 		if err := job.SqlExec(r.Context(), dbChan, `
-		INSERT OR IGNORE INTO favorites (user_id, concert_id)
-		VALUES (?, ?)`, user.ID, concertID); err != nil {
+		INSERT OR IGNORE INTO favorites (user_id, concert_id, created_at)
+		VALUES (?, ?, strftime('%s','now'))`, user.ID, concertID); err != nil {
 			logHttpError(w, http.StatusInternalServerError, "", err)
 			return
 		}

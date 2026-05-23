@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS wt (
 CREATE TABLE IF NOT EXISTS favorites (
 	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 	concert_id INTEGER NOT NULL REFERENCES concerts(id) ON DELETE CASCADE,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	PRIMARY KEY (user_id, concert_id)
 );
 

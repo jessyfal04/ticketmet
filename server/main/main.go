@@ -92,9 +92,11 @@ func openDB(path string) (*sql.DB, error) {
 		return nil, err
 	}
 	// Remove existing database to start fresh.
-	// _ = os.Remove(path)
-	// _ = os.Remove(path + "-shm")
-	// _ = os.Remove(path + "-wal")
+	if os.Getenv("ERASE_DB") == "1" {
+		_ = os.Remove(path)
+		_ = os.Remove(path + "-shm")
+		_ = os.Remove(path + "-wal")
+	}
 
 	db, err := sql.Open("sqlite", path)
 	if err != nil {

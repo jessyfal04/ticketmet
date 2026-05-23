@@ -109,20 +109,20 @@ func AlertRadarPass(ctx context.Context, dbChan chan<- DBRequest, mailChan chan<
 		// We try queueing the mail
 		select {
 		// ok
-			case mailChan <- envelope:
-				// We insert the dedupe keys
-				for _, key := range mailGroup.DedupeKeys {
-					if err := SqlExec(ctx, dbChan, `INSERT OR IGNORE INTO notifications (dedupe_key) VALUES (?)`, key); err != nil {
-						return stats, err
-					}
+		case mailChan <- envelope:
+			// We insert the dedupe keys
+			for _, key := range mailGroup.DedupeKeys {
+				if err := SqlExec(ctx, dbChan, `INSERT OR IGNORE INTO notifications (dedupe_key) VALUES (?)`, key); err != nil {
+					return stats, err
 				}
-				stats.Users++
-				log.Printf("[alertRadar] mail queued for %s items=%d", mailGroup.Email, len(mailGroup.AlertMailItems))
+			}
+			stats.Users++
+			log.Printf("[alertRadar] mail queued for %s items=%d", mailGroup.Email, len(mailGroup.AlertMailItems))
 
-			// full
-			default:
-				stats.QueueFull++
-				log.Printf("[alertRadar] mail queue full for %s items=%d", mailGroup.Email, len(mailGroup.AlertMailItems))
+		// full
+		default:
+			stats.QueueFull++
+			log.Printf("[alertRadar] mail queue full for %s items=%d", mailGroup.Email, len(mailGroup.AlertMailItems))
 		}
 	}
 
@@ -200,7 +200,7 @@ func loadFavoriteAlertCandidates(ctx context.Context, dbChan chan<- DBRequest) (
 			JOIN concerts c ON c.id = f.concert_id
 			JOIN artists a ON a.id = c.artist_id
 			JOIN venues v ON v.id = c.venue_id
-			WHERE c.sale_start_datetime <> '' AND c.sale_start_datetime <= ?
+			WHERE c.sale_start_datetime <> '' AND f.created_at < CAST(strftime('%s', c.sale_start_datetime) AS INTEGER) AND c.sale_start_datetime <= ?
 		)
 		SELECT ca.user_id, ca.email, ca.dedupe_key, ca.concert_id, ca.concert_name, ca.artist_name, ca.venue_name, ca.concert_date
 		FROM candidates ca
