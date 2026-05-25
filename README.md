@@ -1,5 +1,5 @@
 # TicketMet
-Report available in `rapport.pdf`.
+Rapport disponible ici : `rapport.pdf`.
 
 TicketMet is a Go web app for tracking concerts, artists, and venues. It manages WTB (Want To Buy) / WTS (Want To Sell), new-release and sale alerts, matching alerts, automatic emails, Ticketmaster, Setlist.fm, and Passkey login.
 
