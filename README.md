@@ -202,6 +202,7 @@ Setlist potentielle / par artiste (via attractions name)
 
 ## Description client
 - Plan : application monopage avec sections Recherche, Fiche concert, Profil, Auth.
+- Implémentation : JavaScript + jQuery, avec quelques mini islands React.
 - Recherche : liste + filtres + pagination ; appels `GET /api/concerts?artistID=...&venueID=...&country=all|<code>&status=future|all&page=...`, `GET /api/artists`, `GET /api/venues`.
 - Fiche concert : détails + setlist + SNS + WTB/WTS ; appels `GET /api/concerts/{concertId}`, `GET /api/setlist/{concertId}`, `GET /api/favorites/{concertId}`, `GET /api/wt/{concertId}`, actions `POST/DELETE /api/favorites/{concertId}`, `POST/DELETE /api/wt/{concertId}`.
 - Profil : infos utilisateur et SNS ; appels `GET /api/me`, `PATCH /api/me`, création d'alerts via `POST /api/alerts`, suppression via `DELETE /api/alerts/{alertId}`.
@@ -210,5 +211,5 @@ Setlist potentielle / par artiste (via attractions name)
 ## Autre Idées
 - Notification push via Firebase
 - Job additionel qui retire les sessions et challenge passkeys expirés
-- Utilisation de typescript et ajout de plus de modules en React
+- Utilisation de typescript et ajout transformation du code en 100% React notament pour la partie vue des concert en détails, c'est un gros bloc qui doit être fait d'un coup.
 - Mise en place d'une Progressive Web App

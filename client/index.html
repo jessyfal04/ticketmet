@@ -3,11 +3,17 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="icon" type="image/png" href="lib/concert.png">
-	<link rel="stylesheet" href="lib/bulma.min.css">
-	<link rel="stylesheet" href="lib/style.css">
-	<script src="lib/jquery.min.js"></script>
+	<link rel="icon" type="image/png" href="img/concert.png">
+	<link rel="stylesheet" href="style/bulma.min.css">
+	<link rel="stylesheet" href="style/style.css">
+	<script src="https://code.jquery.com/jquery-4.0.0.min.js"></script>
 	<script src="lib/script.js"></script>
+	<script src="lib/account.js"></script>
+	<script src="lib/search.js"></script>
+	<script src="lib/detail.js"></script>
+	<script src="lib/passkeys.js"></script>
+	<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+	<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 	<title>TicketMet</title>
 </head>
 <body>
@@ -59,29 +65,17 @@
 					<div class="columns is-variable is-4 is-multiline">
 						<div class="column">
 							<label class="label" for="artistResults">Artist</label>
-							<div class="select is-fullwidth">
-								<select id="artistResults" onchange="selectArtist()">
-									<option value="">All artists</option>
-								</select>
-							</div>
+							<div id="artistResultsHere"></div>
 						</div>
 
 						<div class="column">
 							<label class="label" for="venueResults">Venue</label>
-							<div class="select is-fullwidth">
-								<select id="venueResults" onchange="selectVenue()">
-									<option value="">All venues</option>
-								</select>
-							</div>
+							<div id="venueResultsHere"></div>
 						</div>
 
 						<div class="column">
 							<label class="label" for="countryResults">Country</label>
-							<div class="select is-fullwidth">
-								<select id="countryResults" onchange="selectCountry()">
-									<option value="">All countries</option>
-								</select>
-							</div>
+							<div id="countryResultsHere"></div>
 						</div>
 
 						<div class="column">
@@ -209,14 +203,8 @@
 							<button class="button is-light" type="button" onclick="shareConcert()">Share</button>
 							<a id="detailURL" class="button is-info is-light" href="#" target="_blank" rel="noreferrer">Ticketmaster</a>
 							<a id="detailSeatmap" class="button is-info is-light" href="#" target="_blank" rel="noreferrer">Seat map</a>
-							<button id="favoriteAddButton" class="button is-primary" type="button" onclick="addFavorite()">Add favorite</button>
-							<button id="favoriteDeleteButton" class="button is-primary is-light" type="button" onclick="deleteFavorite()">Remove favorite</button>
-							<button id="wtbAddButton" class="button is-primary" type="button" onclick="addWT('wtb')">WTB</button>
-							<button id="wtbDeleteButton" class="button is-primary is-light" type="button" onclick="deleteWT('wtb')">Remove WTB</button>
-							<button id="wtsAddButton" class="button is-primary" type="button" onclick="addWT('wts')">WTS</button>
-							<button id="wtsDeleteButton" class="button is-primary is-light" type="button" onclick="deleteWT('wts')">Remove WTS</button>
 						</div>
-						<p id="detailLoginText" class="help mt-2" style="display:none;">Sign in to add favorites or WTB/WTS.</p>
+						<div id="concertActions"></div>
 
 						<div class="columns is-variable is-5">
 							<div class="column is-two-thirds">
@@ -243,7 +231,7 @@
 							</div>
 							<div class="column">
 								<figure class="image is-16by9">
-									<img id="detailPhoto" class="is-rounded" src="lib/concert.png" alt="Concert">
+									<img id="detailPhoto" class="is-rounded" src="img/concert.png" alt="Concert">
 								</figure>
 							</div>
 						</div>
