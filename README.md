@@ -21,7 +21,7 @@ Elle facilite la mise en relation via les SNS pour faire du WTB/WTS et pour se r
 
 ### Notes
 - Les WTB et WTS sont à prix gratuit (comme un don) pour éviter d'avoir des problèmes légaux et pour simplifier l'application.
-- Un favorite active l'alert de vente associée.
+- Un favorite déclenche l'alert de vente si le concert n'a pas encore ouvert ses ventes.
 - Les alerts de nouveauté sont sur des artists ou des venues au choix.
 
 ## Liste de données
@@ -71,29 +71,26 @@ Setlist potentielle / par artiste (via attractions name)
 
 ### Récupérer setlist d'un artiste
 - `GET https://api.setlist.fm/rest/1.0/search/setlists?artistName={nomArtiste}`
-  - Parser `eventDate` (dd-mm-yyyy), `tour`, `sets`, `id`
-  - Filtrer : `tour` si possible présent, `eventDate` < aujourd'hui, `sets` non vide si possible
-  - Prendre le concert le plus récent (max `eventDate`)
-- `GET https://api.setlist.fm/rest/1.0/setlist/{setlistId}`
+  - Prendre la première setlist qui contient des songs
   - Récupérer `sets.song.name` pour la liste des titres
 
 ## Mise à jour
 - publicVisibilityStartDateTime : filtre de nouveauté (SyncTicketmaster.max_visibility)
 - Récupération + insertion des concerts via Ticketmaster
-- Pays synchronisés pour l'instant : Allemagne (`DE`), France (`FR`), Italie (`IT`), Espagne (`ES`) et Autriche (`AT`)
-- Job automatique toutes les 15 minutes, avec clé Ticketmaster fournie par le shell (`TICKETMASTER_API_KEY`)
+- Pays synchronisés (ceux frontaliers à la France): Allemagne (`DE`), France (`FR`), Belgique (`BE`), Pays-Bas (`NL`), Luxembourg (`LU`), Suisse (`CH`), Andorre (`AD`), Grande-Bretagne (`GB`), Italie (`IT`), Monaco (`MC`) et Espagne (`ES`)
+- Job automatique toutes les 15 minutes, avec un premier passage immédiat et clé Ticketmaster fournie par le shell (`TICKETMASTER_API_KEY`)
 - Le job Ticketmaster tourne en goroutine background.
-- Nettoyage sync actuel : ignore les events sans venue/artiste nommé, garde une seule photo 16:9 de meilleure qualité, ignore les dates de vente aberrantes avant 2000
+- Nettoyage sync actuel : ignore les events sans event/venue/artiste exploitable, garde une seule photo avec bonus 16:9 si possible, ignore les dates de vente aberrantes avant 2000
 - Vérification des alerts de nouveauté, des alerts de vente et des matches WTB/WTS via le radar d'alertes
 - Déduplication des notifications déjà envoyées via `notifications.dedupe_key`
-- Récup setlist du concert si artiste dispo dans setlist.fm
+- Récupération du setlist du concert depuis le cache, puis via setlist.fm si `SETLISTFM_API_KEY` est fourni
 
 ## Requêtes implémentées actuellement
 - GET /healthz
   healthcheck serveur
 
-- GET /api/concerts?artistID=...&venueID=...&country=...&status=future|all&page=1
-  liste des concerts, avec filtre optionnel par artiste, salle, pays et pagination
+- GET /api/concerts?artistID=...&venueID=...&country=all|<code>&status=future|all&page=1
+  liste des concerts, avec filtre optionnel par artiste, salle, pays (`all` pour tout voir) et pagination
 
 - GET /api/concerts/{concertId}
   détail d'un concert
@@ -173,7 +170,7 @@ Setlist potentielle / par artiste (via attractions name)
 ## Mail
 - Le serveur mail applicatif est dans `server/job/mailserver.go`.
 - Il tourne en goroutine et consomme des `job.Envelope` depuis un canal buffered.
-- L'inscription pousse un mail de bienvenue dans le canal après création de session : la réponse HTTP n'attend pas l'envoi SMTP.
+- L'inscription pousse un mail de bienvenue dans le canal après création de session : la réponse HTTP n'attend pas l'envoi SMTP, et si la file est pleine le mail est ignoré.
 - Si `SMTP_HOST` est vide, le mail est désactivé sans bloquer l'application.
 - Configuration SMTP :
   - `SMTP_HOST` : serveur SMTP, par exemple `10.66.66.1` depuis Docker/VPN
@@ -196,19 +193,22 @@ Setlist potentielle / par artiste (via attractions name)
 - Accès DB : `server/job/database.go` lance le serveur de requêtes en goroutine ; on peut l'utiliser grâce au lanceurs sql utilisés par les APIs et les jobs.
 - API : `server/api`, handlers pour `/api/concerts`, `/api/artists`, `/api/venues`, `/api/setlist`, `/api/favorites`, `/api/wt`, `/api/me`, `/api/alerts`, `/healthz`.
 - Auth : email/password avec bcrypt, sessions serveur par cookie HttpOnly `session`, passkeys WebAuthn via `github.com/go-webauthn/webauthn`.
-- WebAuthn : domaine configuré dans `server/api/passkeys.go` pour `ticketmet.jessyfal04.dev`.
-- Sync Ticketmaster : `server/job/ticketmaster.go`, lancé dans une goroutine au démarrage puis toutes les 15 minutes, avec `max_visibility`.
+- WebAuthn : domaine de la requête ou via `WEBAUTHN_RP_ID` et `WEBAUTHN_ORIGINS` dans `server/api/passkeys.go`.
+- Sync Ticketmaster : `server/job/ticketmaster.go`, lancé dans une goroutine au démarrage, avec un premier passage immédiat puis toutes les 15 minutes, avec `max_visibility`.
 - Radar d'alertes : `server/job/alertradar.go`, lancé dans une goroutine au démarrage, regroupe les alerts de nouveauté, de vente et les matches WTB/WTS puis envoie un mail par utilisateur.
 - Secrets : `.secrets/ticketmaster.mk`, chargé par le `Makefile`, ignoré par Git.
 - Déploiement : image Docker `docker.io/jessyfal04/ticketmet:latest`, DB persistée dans `/app/data/ticketmet.sqlite3`
-- Setlist.fm : `server/job/setlistfm.go`, lancé dans une goroutine au démarrage et utilisé par `GET /api/setlist/{concertId}` si `SETLISTFM_API_KEY` est fourni.
+- Setlist.fm : `server/job/setlistfm.go`, lancé dans une goroutine au démarrage et utilisé par `GET /api/setlist/{concertId}` depuis le cache, puis interroge Setlist.fm si `SETLISTFM_API_KEY` est fourni.
 
 ## Description client
 - Plan : application monopage avec sections Recherche, Fiche concert, Profil, Auth.
-- Recherche : liste + filtres + pagination ; appels `GET /api/concerts?artistID=...&venueID=...&country=...&status=...&page=...`, `GET /api/artists`, `GET /api/venues`.
+- Recherche : liste + filtres + pagination ; appels `GET /api/concerts?artistID=...&venueID=...&country=all|<code>&status=future|all&page=...`, `GET /api/artists`, `GET /api/venues`.
 - Fiche concert : détails + setlist + SNS + WTB/WTS ; appels `GET /api/concerts/{concertId}`, `GET /api/setlist/{concertId}`, `GET /api/favorites/{concertId}`, `GET /api/wt/{concertId}`, actions `POST/DELETE /api/favorites/{concertId}`, `POST/DELETE /api/wt/{concertId}`.
 - Profil : infos utilisateur et SNS ; appels `GET /api/me`, `PATCH /api/me`, création d'alerts via `POST /api/alerts`, suppression via `DELETE /api/alerts/{alertId}`.
 - Auth : écrans inscription/connexion/déconnexion ; appels `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, passkeys via `/api/auth/passkeys/...`.
 
 ## Autre Idées
-- Notification push via Firebase + Mail de bienvenue
+- Notification push via Firebase
+- Job additionel qui retire les sessions et challenge passkeys expirés
+- Utilisation de typescript et ajout de plus de modules en React
+- Mise en place d'une Progressive Web App

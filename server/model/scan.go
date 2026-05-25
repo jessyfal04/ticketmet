@@ -2,6 +2,11 @@ package model
 
 import "time"
 
+/* 
+List of all the scanner functions
+A scanner function is a function that scans a SQL row into a type T
+*/
+
 // Scanner is interface for scanning SQL rows.
 type Scanner interface {
 	Scan(...any) error

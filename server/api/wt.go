@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 	"server/job"
 	"server/model"
@@ -49,7 +50,7 @@ func handleConcertWT(dbChan chan<- job.DBRequest) http.HandlerFunc {
 		}
 
 		wtbCount, err := job.SqlScanOne(r.Context(), dbChan, `
-		SELECT COUNT(DISTINCT wt.user_id)
+		SELECT COUNT(*)
 		FROM wt
 		WHERE wt.concert_id = ? AND wt.type = 'wtb'`, model.ScanInt, concertID)
 		if err != nil {
@@ -58,7 +59,7 @@ func handleConcertWT(dbChan chan<- job.DBRequest) http.HandlerFunc {
 		}
 
 		wtsCount, err := job.SqlScanOne(r.Context(), dbChan, `
-		SELECT COUNT(DISTINCT wt.user_id)
+		SELECT COUNT(*)
 		FROM wt
 		WHERE wt.concert_id = ? AND wt.type = 'wts'`, model.ScanInt, concertID)
 		if err != nil {
@@ -91,19 +92,12 @@ func handleWTAdd(dbChan chan<- job.DBRequest) http.HandlerFunc {
 			return
 		}
 
-		// Check concert exists
-		exists, err := job.SqlScanOne(r.Context(), dbChan, "SELECT EXISTS(SELECT 1 FROM concerts WHERE id = ?)", model.ScanBool, concertID)
-		if err != nil {
-			logHttpError(w, http.StatusInternalServerError, "", err)
-			return
-		}
-		if !exists {
+		// Load concert date, which also validates existence
+		concertDateText, err := job.SqlScanOne(r.Context(), dbChan, "SELECT date FROM concerts WHERE id = ?", model.ScanString, concertID)
+		if err == sql.ErrNoRows {
 			logHttpError(w, http.StatusNotFound, "concert not found", nil)
 			return
 		}
-
-		// Reject expired concerts.
-		concertDateText, err := job.SqlScanOne(r.Context(), dbChan, "SELECT date FROM concerts WHERE id = ?", model.ScanString, concertID)
 		if err != nil {
 			logHttpError(w, http.StatusInternalServerError, "", err)
 			return

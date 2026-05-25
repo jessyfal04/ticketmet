@@ -38,10 +38,19 @@ func handleAlertCreate(dbChan chan<- job.DBRequest) http.HandlerFunc {
 			return
 		}
 
-		if !targetExists(w, r, dbChan, targetType, targetID) {
+		query := "SELECT EXISTS(SELECT 1 FROM venues WHERE id = ?)"
+		if targetType == "artist" {
+			query = "SELECT EXISTS(SELECT 1 FROM artists WHERE id = ?)"
+		}
+		exists, err := job.SqlScanOne(r.Context(), dbChan, query, model.ScanBool, targetID)
+		if err != nil {
+			logHttpError(w, http.StatusInternalServerError, "", err)
 			return
 		}
-
+		if !exists {
+			logHttpError(w, http.StatusNotFound, "target not found", nil)
+			return
+		}
 		if err := job.SqlExec(r.Context(), dbChan, `
 		INSERT OR IGNORE INTO alerts (user_id, target_type, target_id)
 		VALUES (?, ?, ?)`, user.ID, targetType, targetID); err != nil {
@@ -75,22 +84,4 @@ func handleAlertDelete(dbChan chan<- job.DBRequest) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusNoContent)
 	}
-}
-
-func targetExists(w http.ResponseWriter, r *http.Request, dbChan chan<- job.DBRequest, targetType string, targetID int) bool {
-	query := "SELECT EXISTS(SELECT 1 FROM venues WHERE id = ?)"
-	if targetType == "artist" {
-		query = "SELECT EXISTS(SELECT 1 FROM artists WHERE id = ?)"
-	}
-
-	exists, err := job.SqlScanOne(r.Context(), dbChan, query, model.ScanBool, targetID)
-	if err != nil {
-		logHttpError(w, http.StatusInternalServerError, "", err)
-		return false
-	}
-	if !exists {
-		logHttpError(w, http.StatusNotFound, "target not found", nil)
-		return false
-	}
-	return true
 }

@@ -4,6 +4,11 @@ import (
 	"time"
 )
 
+/* 
+List of all the models used in the application, 
+representing usefull database representations
+*/
+
 type Concert struct {
 	ID                int
 	Name              string

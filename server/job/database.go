@@ -10,7 +10,6 @@ import (
 // DBRequest and DBResult are used to send SQL queries
 // to the DBServer and receive results.
 type DBRequest struct {
-	Ctx context.Context
 	Fn  func(context.Context, *sql.DB) (any, error)
 	Ret chan DBResult
 }
@@ -33,7 +32,7 @@ func RunDBServer(ctx context.Context, db *sql.DB, c chan DBRequest) {
 // Run the DBServer
 func (s *DBServer) Run(ctx context.Context) {
 	runChan(ctx, s.C, func(req DBRequest) {
-		value, err := req.Fn(req.Ctx, s.DB)
+		value, err := req.Fn(ctx, s.DB)
 		select {
 		case req.Ret <- DBResult{Value: value, Err: err}:
 		case <-ctx.Done():
@@ -51,7 +50,6 @@ func WithDB[T any](ctx context.Context, dbChan chan<- DBRequest, fn func(context
 
 	select {
 	case dbChan <- DBRequest{
-		Ctx: ctx,
 		Fn: func(ctx context.Context, db *sql.DB) (any, error) {
 			return fn(ctx, db)
 		},

@@ -32,7 +32,7 @@ func handleProfileGet(dbChan chan<- job.DBRequest) http.HandlerFunc {
 	}
 }
 
-// Update the current-user SNS handles.
+// Update the current-user SNS
 func handleProfilePatch(dbChan chan<- job.DBRequest) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := requireUser(w, r, dbChan)
@@ -52,6 +52,7 @@ func handleProfilePatch(dbChan chan<- job.DBRequest) http.HandlerFunc {
 			return
 		}
 
+		// SNS decoding
 		seen := map[string]bool{}
 		for _, raw := range body.SNS {
 			sns := strings.TrimSpace(raw)

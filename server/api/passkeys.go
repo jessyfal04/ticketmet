@@ -407,16 +407,15 @@ func loadWebAuthnUser(r *http.Request, dbChan chan<- job.DBRequest, id int) (web
 func loadWebAuthnUserByCredentialID(r *http.Request, dbChan chan<- job.DBRequest, credentialID []byte) (webAuthnUser, error) {
 	encodedID := base64.RawURLEncoding.EncodeToString(credentialID)
 
-	user, err := job.SqlScanOne(r.Context(), dbChan, `
-		SELECT u.id, u.email, u.password_hash
-		FROM users u
-		JOIN webauthn_credentials wc ON wc.user_id = u.id
-		WHERE wc.credential_id = ?`, model.ScanUser, encodedID)
+	userID, err := job.SqlScanOne(r.Context(), dbChan, `
+		SELECT user_id
+		FROM webauthn_credentials
+		WHERE credential_id = ?`, model.ScanInt, encodedID)
 	if err != nil {
 		return webAuthnUser{}, err
 	}
 
-	return loadWebAuthnUser(r, dbChan, user.ID)
+	return loadWebAuthnUser(r, dbChan, userID)
 }
 
 // Stores the WebAuthn SessionData
@@ -454,16 +453,14 @@ func loadWebAuthnChallenge(r *http.Request, dbChan chan<- job.DBRequest, userID 
 		return waSession, 0, sql.ErrNoRows
 	}
 
-	// Query the latest non-expired session for this user and kind, if userID is provided. Otherwise, query the latest session by token and kind.
+	// Query the non-expired session for this user and kind, if userID is provided. Otherwise, query the session by token and kind.
 	challenge, err := job.SqlScanOne(r.Context(), dbChan, `
 		SELECT id, session_data
 		FROM webauthn_challenges
 		WHERE (? IS NULL OR user_id = ?)
 			AND token_hash = ?
 			AND kind = ?
-			AND expires_at > strftime('%s','now')
-		ORDER BY id DESC
-		LIMIT 1`, model.ScanWebAuthnChallenge, nullableInt(userID), nullableInt(userID), hashToken(cookie.Value), kind)
+			AND expires_at > strftime('%s','now')`, model.ScanWebAuthnChallenge, nullableInt(userID), nullableInt(userID), hashToken(cookie.Value), kind)
 	if err != nil {
 		return waSession, 0, err
 	}

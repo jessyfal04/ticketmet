@@ -73,6 +73,7 @@ func main() {
 	}
 }
 
+// Configure logging to write to both stdout and a file, with timestamps
 func configureLog(path string) (*os.File, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, err
@@ -87,6 +88,7 @@ func configureLog(path string) (*os.File, error) {
 	return file, nil
 }
 
+// Open the SQLite database, creating it if it doesn't exist, and apply the schema
 func openDB(path string) (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return nil, err

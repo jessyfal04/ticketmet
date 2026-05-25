@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// Run a function every interval
 func runEvery(ctx context.Context, interval time.Duration, run func()) {
 	run()
 
@@ -28,6 +29,7 @@ func runEvery(ctx context.Context, interval time.Duration, run func()) {
 	}
 }
 
+// Run a loop that receive from a chan and send to a handler
 func runChan[T any](ctx context.Context, c <-chan T, handle func(T)) {
 	for {
 		select {

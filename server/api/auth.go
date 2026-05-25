@@ -87,12 +87,15 @@ func handleRegister(dbChan chan<- job.DBRequest, mailChan chan<- job.Envelope) h
 			return
 		}
 
-		// Send welcome email
+		// Try sending welcome email
 		envelope := job.Envelope{
 			Dst:     user.Email,
 			Message: job.WelcomeMail(user.Email),
 		}
-		mailChan <- envelope
+		select {
+		case mailChan <- envelope:
+		default:
+		}
 
 		writeJSON(w, authUserResponse{User: user.Public()})
 	}
@@ -111,10 +114,11 @@ func handleLogin(dbChan chan<- job.DBRequest) http.HandlerFunc {
 		}
 
 		// Check credentials
+		email := strings.ToLower(strings.TrimSpace(body.Email))
 		user, err := job.SqlScanOne(r.Context(), dbChan, `
 			SELECT id, email, password_hash
 			FROM users
-			WHERE email = ?`, model.ScanUser, body.Email)
+			WHERE email = ?`, model.ScanUser, email)
 		if err != nil || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(body.Password)) != nil {
 			logHttpError(w, http.StatusUnauthorized, "invalid email or password", nil)
 			return
@@ -281,6 +285,7 @@ func sessionCookie(r *http.Request, value string, maxAge int) *http.Cookie {
 	}
 }
 
+// Check if request is secure (helps for localhost)
 func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
