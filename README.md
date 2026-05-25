@@ -5,4 +5,4 @@ TicketMet is a Go web app for tracking concerts, artists, and venues. It manages
 
 Run locally: `make server` | Deploy: `make docker-deploy` (with your VPS config and without using `docker-build` ^^)
 Repo: https://github.com/jessyfal04/ticketmet
-Site: https://ticketmet.jessyfal04
+Site: https://ticketmet.jessyfal04.dev
