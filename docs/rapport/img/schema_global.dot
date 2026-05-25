@@ -1,0 +1,95 @@
+digraph TicketMetSystem {
+  graph [
+    rankdir=LR,
+    splines=ortho,
+    compound=true,
+    bgcolor="white",
+    pad=0.18,
+    nodesep=0.42,
+    ranksep=0.72,
+    fontname="Helvetica",
+    fontsize=22,
+    labelloc=t,
+    label="TicketMet - schéma global du système"
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Helvetica",
+    fontsize=11,
+    color="#334155",
+    penwidth=1.35,
+    margin="0.18,0.12"
+  ];
+
+  edge [
+    fontname="Helvetica",
+    fontsize=10,
+    color="#475569",
+    penwidth=1.35,
+    arrowsize=0.78
+  ];
+
+  subgraph cluster_client {
+    label="CLIENT";
+    color="#0284c7";
+    style="rounded,filled";
+    fillcolor="#e0f2fe";
+
+    client [label="Browser / SPA\nBulma + jQuery + React islands", fillcolor="#bfdbfe", color="#2563eb"];
+  }
+
+  subgraph cluster_ajax {
+    label="AJAX";
+    color="#65a30d";
+    style="rounded,filled";
+    fillcolor="#ecfccb";
+
+    ajax [label="Appels asynchrones\nGET / POST / PATCH / DELETE", fillcolor="#d9f99d", color="#4d7c0f"];
+  }
+
+  subgraph cluster_server {
+    label="SERVER";
+    color="#ea580c";
+    style="rounded,filled";
+    fillcolor="#fff7ed";
+
+    server_api [label="server/api\nhandlers HTTP", fillcolor="#bae6fd", color="#0284c7"];
+    server_model [label="server/model\nstructs + scanners\nmodels.go / scan.go", fillcolor="#e0f2fe", color="#0ea5e9"];
+    channels [label="dbChan\nmailChan\nsetlistChan", fillcolor="#ccfbf1", color="#0f766e"];
+    server_jobs [label="server/jobs\n\ndatabase.go\nworker.go\nticketmaster.go\nsetlistfm.go\nalertradar.go\nmailserver.go", fillcolor="#fed7aa", color="#f97316"];
+    sqlite [shape=cylinder, label="SQLite\n/app/data/ticketmet.sqlite3", fillcolor="#fde68a", color="#d97706"];
+
+    server_api -> server_model [style=invis, weight=8];
+    server_model -> channels [style=invis, weight=8];
+    channels -> server_jobs [style=invis, weight=8];
+    server_jobs -> sqlite [style=invis, weight=8];
+  }
+
+  subgraph cluster_external {
+    label="API EXTERNES";
+    color="#8b5cf6";
+    style="rounded,filled";
+    fillcolor="#f5f3ff";
+
+    tm [label="Ticketmaster API", fillcolor="#ddd6fe", color="#7c3aed"];
+    sl [label="Setlist.fm API", fillcolor="#e9d5ff", color="#8b5cf6"];
+    smtp [label="SMTP server", fillcolor="#fecaca", color="#dc2626"];
+
+    tm -> sl [style=invis, weight=8];
+    sl -> smtp [style=invis, weight=8];
+  }
+
+  client -> ajax [color="#2563eb"];
+  ajax -> server_api [color="#16a34a"];
+  server_api -> server_model [color="#0284c7"];
+
+  server_model -> channels [color="#0f766e"];
+  channels -> server_jobs [color="#0f766e"];
+  server_jobs -> sqlite [color="#d97706"];
+
+  server_jobs -> tm [color="#7c3aed"];
+  server_jobs -> sl [color="#8b5cf6"];
+  server_jobs -> smtp [color="#dc2626"];
+}
