@@ -295,6 +295,38 @@ PATCH /api/me & modifier le profil, ici les SNS & profil mis à jour \\
 \end{table}
 \normalsize
 
+\subsection{Sortie JSON}
+
+\begin{itemize}
+  \item Requête :
+\begin{verbatim}
+GET /api/auth/passkeys
+\end{verbatim}
+  \item Struct :
+\begin{verbatim}
+type passkeyListResponse struct {
+    Passkeys []model.PublicPasskey
+}
+\end{verbatim}
+  \item Réponse JSON :
+\begin{verbatim}
+{
+  "Passkeys": [
+    {
+      "CredentialID": "c29tZS1jcmVkZW50aWFsLWlk",
+      "SignCount": 12
+    }
+  ]
+}
+\end{verbatim}
+  \item Explication :
+  \begin{itemize}
+    \item \code{passkeyListResponse} est la struct racine envoyée par \code{writeJSON}.
+    \item \code{Passkeys} est une liste de \code{model.PublicPasskey}.
+    \item Chaque passkey publique garde seulement \code{CredentialID} et \code{SignCount}.
+  \end{itemize}
+\end{itemize}
+
 \section{Description serveur}
 
 Le serveur Go s'appuie sur \code{net/http} pour l'HTTP et sur \code{database/sql} pour SQLite. J'ai gardé les routes proches des données, et les requêtes SQL restent visibles dans les handlers et dans les jobs.
