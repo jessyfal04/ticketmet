@@ -470,6 +470,19 @@ Le schéma ci-dessous résume la chaîne principale : client, AJAX, serveur, job
 \label{fig:schema-global}
 \end{figure}
 
+\section{Sécurité}
+
+\begin{itemize}
+  \item Les mots de passe sont hashés avec \code{bcrypt} avant stockage.
+  \item Les sessions sont stockées en base sous forme de hash \code{token_hash}.
+  \item Les challenges WebAuthn sont aussi stockés sous forme de hash avec une durée de vie courte.
+  \item La passkey est utilisée pour la connexion sans mot de passe.
+  \item Le cookie de session est \code{HttpOnly} et passe en \code{Secure} quand la requête est en HTTPS.
+  \item L'email est validé à l'inscription.
+  \item Le mot de passe doit faire au moins 8 caractères.
+  \item L'expiration de session est vérifiée côté serveur avant de considérer comme l'utilisateur connecté.
+\end{itemize}
+
 \section{Perspectives futures}
 
 \begin{itemize}
@@ -479,6 +492,7 @@ Le schéma ci-dessous résume la chaîne principale : client, AJAX, serveur, job
   \item Mise en place d'une Progressive Web App
 \end{itemize}
 
+\clearpage
 \section{Références et IA}
 
 Mes dépôts GitHub d'anciens projets \href{https://github.com/jessyfal04/avotey}{\code{avotey}} pour la partie visuelle et \href{https://github.com/jessyfal04/webauthnnotes}{\code{webauthnnotes}} pour la partie Passkey.
